@@ -1,6 +1,7 @@
 package com.stokakun.app.util
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import java.io.File
 import java.util.UUID
@@ -10,7 +11,6 @@ import java.util.UUID
  * internal storage. Only the file path is stored in Room.
  */
 object ImageStorageManager {
-
     private const val FOLDER_NAME = "screenshots"
     private const val MAX_IMAGE_BYTES = 25L * 1024L * 1024L
 
@@ -23,7 +23,10 @@ object ImageStorageManager {
     fun copyImageToLocalStorage(context: Context, sourceUri: Uri): String? {
         var destFile: File? = null
         return try {
-            val extension = guessExtension(context, sourceUri)
+            val mimeType = context.contentResolver.getType(sourceUri)
+            require(mimeType?.startsWith("image/") == true) { "File yang dipilih bukan gambar." }
+
+            val extension = guessExtension(mimeType)
             val file = File(screenshotsDir(context), "${UUID.randomUUID()}.$extension")
             destFile = file
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
@@ -39,6 +42,8 @@ object ImageStorageManager {
                     }
                 }
             } ?: return null
+
+            require(isReadableImage(file)) { "File yang dipilih bukan gambar yang valid." }
             file.absolutePath
         } catch (_: Exception) {
             destFile?.delete()
@@ -50,8 +55,9 @@ object ImageStorageManager {
         var destFile: File? = null
         return try {
             require(sourceFile.isFile) { "File screenshot tidak valid." }
-            require(sourceFile.length() <= MAX_IMAGE_BYTES) { "Ukuran screenshot terlalu besar. Maksimal 25 MB per gambar." }
-            val extension = sourceFile.extension.ifBlank { "jpg" }
+            require(sourceFile.length() in 1..MAX_IMAGE_BYTES) { "Ukuran screenshot tidak valid." }
+            require(isReadableImage(sourceFile)) { "File backup berisi screenshot yang tidak valid." }
+            val extension = sourceFile.extension.lowercase().ifBlank { "jpg" }
             val file = File(screenshotsDir(context), "${UUID.randomUUID()}.$extension")
             destFile = file
             sourceFile.inputStream().use { input ->
@@ -66,13 +72,17 @@ object ImageStorageManager {
         }
     }
 
-    private fun guessExtension(context: Context, uri: Uri): String {
-        val type = context.contentResolver.getType(uri) ?: return "jpg"
-        return when {
-            type.contains("png") -> "png"
-            type.contains("webp") -> "webp"
-            else -> "jpg"
-        }
+    private fun guessExtension(mimeType: String): String = when {
+        mimeType.contains("png", ignoreCase = true) -> "png"
+        mimeType.contains("webp", ignoreCase = true) -> "webp"
+        mimeType.contains("jpeg", ignoreCase = true) || mimeType.contains("jpg", ignoreCase = true) -> "jpg"
+        else -> "img"
+    }
+
+    private fun isReadableImage(file: File): Boolean {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        return options.outWidth > 0 && options.outHeight > 0
     }
 
     fun deleteFile(path: String) {
