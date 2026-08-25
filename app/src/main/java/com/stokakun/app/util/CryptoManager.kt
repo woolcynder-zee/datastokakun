@@ -1,4 +1,4 @@
-package com.stokakun.app.data
+package com.stokakun.app.util
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -10,10 +10,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Encrypts/decrypts the account password field using a key stored in the
- * Android Keystore. The key never leaves secure hardware/software storage.
- * Ciphertext + IV are stored together (Base64) in Room; plaintext password
- * is never written to disk, logs, or notifications.
+ * Encrypts/decrypts account passwords using an AES-GCM key stored in Android Keystore.
+ * Ciphertext and IV are stored together in Room; plaintext is not persisted by this class.
  */
 object CryptoManager {
 
@@ -28,9 +26,7 @@ object CryptoManager {
         val existing = keyStore.getKey(KEY_ALIAS, null) as? SecretKey
         if (existing != null) return existing
 
-        val keyGenerator = KeyGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE
-        )
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         val spec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -56,13 +52,20 @@ object CryptoManager {
 
     fun decrypt(stored: String): String {
         if (stored.isEmpty()) return ""
-        val combined = Base64.decode(stored, Base64.NO_WRAP)
-        if (combined.size < IV_LENGTH_BYTES) return ""
-        val iv = combined.copyOfRange(0, IV_LENGTH_BYTES)
-        val cipherBytes = combined.copyOfRange(IV_LENGTH_BYTES, combined.size)
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
-        val plainBytes = cipher.doFinal(cipherBytes)
-        return String(plainBytes, Charsets.UTF_8)
+        return try {
+            val combined = Base64.decode(stored, Base64.NO_WRAP)
+            if (combined.size < IV_LENGTH_BYTES) return ""
+            val iv = combined.copyOfRange(0, IV_LENGTH_BYTES)
+            val cipherBytes = combined.copyOfRange(IV_LENGTH_BYTES, combined.size)
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                getOrCreateKey(),
+                GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            )
+            String(cipher.doFinal(cipherBytes), Charsets.UTF_8)
+        } catch (_: Exception) {
+            ""
+        }
     }
 }
