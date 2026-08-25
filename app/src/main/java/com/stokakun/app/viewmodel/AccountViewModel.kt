@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -41,7 +43,11 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     fun setSort(option: SortOption) { _sort.value = option }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val filteredAccounts: StateFlow<List<AccountEntity>> = combine(_searchQuery, _statusFilter, _sort) { query, status, sort -> Triple(query, status, sort) }
+    val filteredAccounts: StateFlow<List<AccountEntity>> = combine(
+        _searchQuery.debounce(250).distinctUntilChanged(),
+        _statusFilter,
+        _sort
+    ) { query, status, sort -> Triple(query, status, sort) }
         .flatMapLatest { (query, status, sort) -> repository.getFiltered(status, query).map { sortAccounts(it, sort) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
