@@ -1,6 +1,6 @@
 # Stok Akun
 
-Aplikasi Android lokal untuk mencatat stok akun game dan banyak screenshot fullspek.
+Aplikasi Android lokal untuk mencatat stok dan data akun game kamu.
 
 ## Data & privasi
 - Metadata akun disimpan di Room (database lokal).
