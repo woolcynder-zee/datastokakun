@@ -88,9 +88,7 @@ fun DetailScreen(
         }
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -101,85 +99,37 @@ fun DetailScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(acc.game, style = MaterialTheme.typography.titleLarge)
                             StatusBadge(status = acc.status)
                         }
-                        Text(
-                            acc.name,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        Text(
-                            formatPrice(acc.price),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Text(acc.name, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                        Text(formatPrice(acc.price), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
-
-            item {
-                DetailInfoCard(title = "Email / Username", value = acc.username.ifBlank { "-" })
-            }
-
+            item { DetailInfoCard(title = "Email / Username", value = acc.username.ifBlank { "-" }) }
             item {
                 val decrypted = remember(acc.passwordEncrypted) { viewModel.decryptPassword(acc.passwordEncrypted) }
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text("Password", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                if (passwordVisible) decrypted.ifBlank { "-" } else "••••••••",
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                            Text(if (passwordVisible) decrypted.ifBlank { "-" } else "••••••••", modifier = Modifier.padding(top = 4.dp))
                         }
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = null
-                            )
+                            Icon(if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
                         }
                     }
                 }
             }
-
-            item {
-                DetailInfoCard(title = "Catatan", value = acc.notes.ifBlank { "-" })
-            }
-
-            item {
-                Text(
-                    "Gallery Fullspek (${screenshots.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
+            item { DetailInfoCard(title = "Catatan", value = acc.notes.ifBlank { "-" }) }
+            item { Text("Gallery Fullspek (${screenshots.size})", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground) }
             item {
                 if (screenshots.isEmpty()) {
-                    Text(
-                        "Belum ada screenshot fullspek.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Belum ada screenshot fullspek.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    GalleryGrid(
-                        paths = screenshots.map { it.filePath },
-                        onImageClick = { index -> onImageClick(accountId, index) }
-                    )
+                    GalleryGrid(paths = screenshots.map { it.filePath }, onImageClick = { index -> onImageClick(accountId, index) })
                 }
             }
         }
@@ -192,16 +142,10 @@ fun DetailScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         showDeleteConfirm = false
-                        viewModel.deleteAccount(acc) { onDeleted() }
-                    }) {
-                        Text("Hapus", color = MaterialTheme.colorScheme.error)
-                    }
+                        viewModel.deleteAccount(acc, onDone = { onDeleted() })
+                    }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteConfirm = false }) {
-                        Text("Batal")
-                    }
-                }
+                dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
             )
         }
     }
@@ -209,11 +153,7 @@ fun DetailScreen(
 
 @Composable
 private fun DetailInfoCard(title: String, value: String) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, modifier = Modifier.padding(top = 4.dp))
@@ -227,31 +167,18 @@ private fun GalleryGrid(paths: List<String>, onImageClick: (Int) -> Unit) {
     val rows = (paths.size + columns - 1) / columns
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (row in 0 until rows) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 for (col in 0 until columns) {
                     val index = row * columns + col
                     if (index < paths.size) {
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
+                            modifier = Modifier.weight(1f).aspectRatio(1f)
                                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onImageClick(index) }
+                                .clip(RoundedCornerShape(8.dp)).clickable { onImageClick(index) }
                         ) {
-                            AsyncImage(
-                                model = File(paths[index]),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            AsyncImage(model = File(paths[index]), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         }
-                    } else {
-                        Box(modifier = Modifier.weight(1f))
-                    }
+                    } else Box(modifier = Modifier.weight(1f))
                 }
             }
         }
