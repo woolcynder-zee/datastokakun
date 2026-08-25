@@ -14,7 +14,6 @@ import javax.crypto.spec.GCMParameterSpec
  * Ciphertext and IV are stored together in Room; plaintext is not persisted by this class.
  */
 object CryptoManager {
-
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val KEY_ALIAS = "stok_akun_password_key"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -50,11 +49,12 @@ object CryptoManager {
         return Base64.encodeToString(combined, Base64.NO_WRAP)
     }
 
-    fun decrypt(stored: String): String {
+    /** Strict path for operations that must distinguish a real password from decryption failure. */
+    fun decryptOrNull(stored: String): String? {
         if (stored.isEmpty()) return ""
-        return try {
+        return runCatching {
             val combined = Base64.decode(stored, Base64.NO_WRAP)
-            if (combined.size < IV_LENGTH_BYTES) return ""
+            if (combined.size < IV_LENGTH_BYTES) return null
             val iv = combined.copyOfRange(0, IV_LENGTH_BYTES)
             val cipherBytes = combined.copyOfRange(IV_LENGTH_BYTES, combined.size)
             val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -64,8 +64,9 @@ object CryptoManager {
                 GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
             )
             String(cipher.doFinal(cipherBytes), Charsets.UTF_8)
-        } catch (_: Exception) {
-            ""
-        }
+        }.getOrNull()
     }
+
+    /** UI-friendly path that preserves the existing non-crashing behavior. */
+    fun decrypt(stored: String): String = decryptOrNull(stored).orEmpty()
 }
