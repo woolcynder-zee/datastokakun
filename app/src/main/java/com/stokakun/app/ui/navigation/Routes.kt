@@ -4,6 +4,7 @@ object Routes {
     const val HOME = "home"
     const val LIST = "list"
     const val ADD = "add"
+    const val STORAGE = "storage"
     const val EDIT = "edit/{accountId}"
     const val DETAIL = "detail/{accountId}"
     const val FULLSCREEN = "fullscreen/{accountId}/{index}"
