@@ -20,19 +20,35 @@ import java.util.zip.ZipOutputStream
 object BackupManager {
     private const val METADATA_FILE = "metadata.json"
     private const val SCREENSHOTS_FOLDER = "screenshots"
-    private const val FORMAT_VERSION = 1
+    private const val FORMAT_VERSION = 2
+    private const val LEGACY_FORMAT_VERSION = 1
     private const val MAX_ENTRIES = 2000
     private const val MAX_UNCOMPRESSED_BYTES = 512L * 1024L * 1024L
 
-    suspend fun export(context: Context, destUri: Uri, accountDao: AccountDao, screenshotDao: ScreenshotDao) {
+    suspend fun export(
+        context: Context,
+        destUri: Uri,
+        accountDao: AccountDao,
+        screenshotDao: ScreenshotDao,
+        backupPassword: String
+    ) {
+        require(backupPassword.length >= 8) { "Password backup minimal 8 karakter." }
         val accounts = accountDao.getAllOnce()
         val screenshots = screenshotDao.getAllOnce()
         val accountsJson = JSONArray()
         accounts.forEach { acc ->
+            val plainPassword = runCatching { CryptoManager.decrypt(acc.passwordEncrypted) }
+                .getOrElse { throw IllegalArgumentException("Tidak bisa membaca password akun ${acc.name}. Pastikan aplikasi masih berada di instalasi yang menyimpan data asli.") }
             accountsJson.put(JSONObject().apply {
-                put("id", acc.id); put("game", acc.game); put("name", acc.name); put("price", acc.price)
-                put("status", acc.status.name); put("username", acc.username); put("passwordEncrypted", acc.passwordEncrypted)
-                put("notes", acc.notes); put("createdAt", acc.createdAt)
+                put("id", acc.id)
+                put("game", acc.game)
+                put("name", acc.name)
+                put("price", acc.price)
+                put("status", acc.status.name)
+                put("username", acc.username)
+                put("passwordBackup", PortableBackupCrypto.encrypt(plainPassword, backupPassword))
+                put("notes", acc.notes)
+                put("createdAt", acc.createdAt)
             })
         }
         val screenshotsJson = JSONArray()
@@ -40,12 +56,16 @@ object BackupManager {
             val file = File(shot.filePath)
             if (!file.exists() || !file.isFile) return@forEach
             screenshotsJson.put(JSONObject().apply {
-                put("accountId", shot.accountId); put("zipEntry", "$SCREENSHOTS_FOLDER/${file.name}")
-                put("createdAt", shot.createdAt); put("sortOrder", shot.sortOrder)
+                put("accountId", shot.accountId)
+                put("zipEntry", "$SCREENSHOTS_FOLDER/${file.name}")
+                put("createdAt", shot.createdAt)
+                put("sortOrder", shot.sortOrder)
             })
         }
         val root = JSONObject().apply {
-            put("version", FORMAT_VERSION); put("accounts", accountsJson); put("screenshots", screenshotsJson)
+            put("version", FORMAT_VERSION)
+            put("accounts", accountsJson)
+            put("screenshots", screenshotsJson)
         }
         context.contentResolver.openOutputStream(destUri)?.use { out ->
             ZipOutputStream(out).use { zip ->
@@ -69,7 +89,8 @@ object BackupManager {
         sourceUri: Uri,
         database: AppDatabase,
         accountDao: AccountDao,
-        screenshotDao: ScreenshotDao
+        screenshotDao: ScreenshotDao,
+        backupPassword: String?
     ): Boolean {
         val tempDir = File(context.cacheDir, "backup_import_${UUID.randomUUID()}")
         require(tempDir.mkdirs()) { "Tidak dapat membuat folder sementara." }
@@ -117,7 +138,12 @@ object BackupManager {
             } ?: return false
 
             val json = JSONObject(metadataText ?: return false)
-            require(json.optInt("version", -1) == FORMAT_VERSION) { "Versi backup tidak didukung." }
+            val version = json.optInt("version", -1)
+            require(version == FORMAT_VERSION || version == LEGACY_FORMAT_VERSION) { "Versi backup tidak didukung." }
+            if (version == FORMAT_VERSION) {
+                require(!backupPassword.isNullOrBlank()) { "Backup ini membutuhkan password backup." }
+                require(backupPassword.length >= 8) { "Password backup minimal 8 karakter." }
+            }
             val accountsJson = json.getJSONArray("accounts")
             val screenshotsJson = json.getJSONArray("screenshots")
             require(accountsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak akun." }
@@ -137,13 +163,27 @@ object BackupManager {
                         idMap[oldId] = duplicate.id
                         continue
                     }
+                    val passwordEncrypted = if (version == FORMAT_VERSION) {
+                        PortableBackupCrypto.encrypt(
+                            PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!),
+                            "local-import-placeholder"
+                        )
+                    } else {
+                        a.getString("passwordEncrypted")
+                    }
+                    val restoredPassword = if (version == FORMAT_VERSION) {
+                        val plain = PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!)
+                        CryptoManager.encrypt(plain)
+                    } else {
+                        passwordEncrypted
+                    }
                     val newId = accountDao.insert(AccountEntity(
                         game = game,
                         name = name,
                         price = a.getLong("price").coerceAtLeast(0L),
                         status = AccountStatus.valueOf(a.getString("status")),
                         username = username,
-                        passwordEncrypted = a.getString("passwordEncrypted"),
+                        passwordEncrypted = restoredPassword,
                         notes = a.getString("notes"),
                         createdAt = a.getLong("createdAt")
                     ))
