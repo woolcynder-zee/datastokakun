@@ -27,6 +27,9 @@ interface AccountDao {
     @Query("SELECT COALESCE(SUM(price), 0) FROM accounts WHERE status != 'SOLD'")
     fun getActiveStockValue(): Flow<Long>
 
+    @Query("SELECT COALESCE(SUM(price), 0) FROM accounts WHERE status = 'SOLD'")
+    fun getSoldStockValue(): Flow<Long>
+
     @Query("SELECT * FROM accounts WHERE game = :game AND name = :name AND username = :username LIMIT 1")
     suspend fun findDuplicate(game: String, name: String, username: String): AccountEntity?
 
