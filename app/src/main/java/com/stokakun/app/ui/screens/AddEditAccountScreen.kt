@@ -37,6 +37,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -44,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +63,7 @@ import com.stokakun.app.data.ScreenshotEntity
 import com.stokakun.app.ui.components.statusLabel
 import com.stokakun.app.viewmodel.AccountViewModel
 import java.io.File
+import kotlinx.coroutines.launch
 
 private data class ThumbItem(
     val key: String,
@@ -78,20 +82,14 @@ fun AddEditAccountScreen(
     onBack: () -> Unit
 ) {
     val isEdit = accountId != null
-
     val existingAccount: AccountEntity? = if (isEdit) {
         val state by viewModel.accountFlow(accountId!!).collectAsState()
         state
-    } else {
-        null
-    }
-
+    } else null
     val existingScreenshots: List<ScreenshotEntity> = if (isEdit) {
         val state by viewModel.screenshotsFlow(accountId!!).collectAsState()
         state
-    } else {
-        emptyList()
-    }
+    } else emptyList()
 
     var game by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
@@ -99,14 +97,16 @@ fun AddEditAccountScreen(
     var status by remember { mutableStateOf(AccountStatus.AVAILABLE) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var initialPassword by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var initialized by remember { mutableStateOf(false) }
-
     var newImages by remember { mutableStateOf(listOf<Uri>()) }
     var removedExistingIds by remember { mutableStateOf(listOf<Long>()) }
+    var statusMenuExpanded by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    // Preload form fields once, the first time the existing account data arrives.
     if (isEdit && !initialized && existingAccount != null) {
         val acc = existingAccount
         game = acc.game
@@ -115,6 +115,7 @@ fun AddEditAccountScreen(
         status = acc.status
         username = acc.username
         password = viewModel.decryptPassword(acc.passwordEncrypted)
+        initialPassword = password
         notes = acc.notes
         initialized = true
     }
@@ -122,24 +123,21 @@ fun AddEditAccountScreen(
     val pickImagesLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
-        if (uris.isNotEmpty()) {
-            newImages = newImages + uris
-        }
+        if (uris.isNotEmpty()) newImages = newImages + uris
     }
 
     val visibleThumbs = remember(existingScreenshots, newImages, removedExistingIds) {
         val existing = existingScreenshots
             .filter { it.id !in removedExistingIds }
-            .map { ThumbItem(key = "e${it.id}", isExisting = true, existingId = it.id, existingPath = it.filePath) }
+            .map { ThumbItem("e${it.id}", true, it.id, it.filePath) }
         val added = newImages.mapIndexed { idx, uri ->
-            ThumbItem(key = "n$idx-$uri", isExisting = false, newUri = uri)
+            ThumbItem("n$idx-$uri", false, newUri = uri)
         }
         existing + added
     }
 
-    var statusMenuExpanded by remember { mutableStateOf(false) }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (isEdit) "Edit Akun" else "Tambah Akun") },
@@ -152,28 +150,12 @@ fun AddEditAccountScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                OutlinedTextField(
-                    value = game,
-                    onValueChange = { game = it },
-                    label = { Text("Game") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            item {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nama / ID Stok") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            item { OutlinedTextField(value = game, onValueChange = { game = it }, label = { Text("Game") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama / ID Stok") }, modifier = Modifier.fillMaxWidth()) }
             item {
                 OutlinedTextField(
                     value = price,
@@ -184,44 +166,24 @@ fun AddEditAccountScreen(
                 )
             }
             item {
-                ExposedDropdownMenuBox(
-                    expanded = statusMenuExpanded,
-                    onExpandedChange = { statusMenuExpanded = it }
-                ) {
+                ExposedDropdownMenuBox(expanded = statusMenuExpanded, onExpandedChange = { statusMenuExpanded = it }) {
                     OutlinedTextField(
-                        value = statusLabel(status),
-                        onValueChange = {},
-                        readOnly = true,
+                        value = statusLabel(status), onValueChange = {}, readOnly = true,
                         label = { Text("Status") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusMenuExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
-                    DropdownMenu(
-                        expanded = statusMenuExpanded,
-                        onDismissRequest = { statusMenuExpanded = false }
-                    ) {
+                    DropdownMenu(expanded = statusMenuExpanded, onDismissRequest = { statusMenuExpanded = false }) {
                         AccountStatus.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(statusLabel(option)) },
-                                onClick = {
-                                    status = option
-                                    statusMenuExpanded = false
-                                }
-                            )
+                            DropdownMenuItem(text = { Text(statusLabel(option)) }, onClick = {
+                                status = option
+                                statusMenuExpanded = false
+                            })
                         }
                     }
                 }
             }
-            item {
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Email / Username") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            item { OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Email / Username") }, modifier = Modifier.fillMaxWidth()) }
             item {
                 OutlinedTextField(
                     value = password,
@@ -230,65 +192,37 @@ fun AddEditAccountScreen(
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = null
-                            )
+                            Icon(if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "Tampilkan password")
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            item {
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Catatan") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-            }
-
-            item {
-                Text(
-                    text = "Fullspek (${visibleThumbs.size} screenshot)",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
+            item { OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Catatan") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
+            item { Text("Fullspek (${visibleThumbs.size} screenshot)", style = MaterialTheme.typography.titleMedium) }
             item {
                 OutlinedButton(
-                    onClick = {
-                        pickImagesLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
+                    onClick = { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null)
                     Text("  Tambah Screenshot")
                 }
             }
-
-            // Thumbnails rendered as a manual wrap-grid inside a single LazyColumn item
-            // (avoids nesting a scrollable grid inside a scrollable column).
             item {
-                ThumbnailGrid(
-                    thumbs = visibleThumbs,
-                    onRemove = { thumb ->
-                        if (thumb.isExisting && thumb.existingId != null) {
-                            removedExistingIds = removedExistingIds + thumb.existingId
-                        } else if (thumb.newUri != null) {
-                            newImages = newImages - thumb.newUri
-                        }
+                ThumbnailGrid(visibleThumbs) { thumb ->
+                    if (thumb.isExisting && thumb.existingId != null) {
+                        removedExistingIds = removedExistingIds + thumb.existingId
+                    } else if (thumb.newUri != null) {
+                        newImages = newImages - thumb.newUri
                     }
-                )
+                }
             }
-
             item {
                 Button(
                     onClick = {
                         val priceValue = price.toLongOrNull() ?: 0L
+                        val unchangedPassword = isEdit && password == initialPassword
                         viewModel.saveAccount(
                             existingId = accountId,
                             originalCreatedAt = existingAccount?.createdAt,
@@ -298,46 +232,34 @@ fun AddEditAccountScreen(
                             status = status,
                             username = username.trim(),
                             plainPassword = password,
+                            passwordEncryptedOverride = if (unchangedPassword) existingAccount?.passwordEncrypted else null,
                             notes = notes.trim(),
                             newImageUris = newImages,
                             removedScreenshotIds = removedExistingIds,
-                            onDone = { onSaved() }
+                            onDone = { onSaved() },
+                            onError = { error -> scope.launch { snackbarHostState.showSnackbar(error.message ?: "Gagal menyimpan akun.") } }
                         )
                     },
                     enabled = game.isNotBlank() && name.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Simpan")
-                }
+                ) { Text("Simpan") }
             }
         }
     }
 }
 
 @Composable
-private fun ThumbnailGrid(
-    thumbs: List<ThumbItem>,
-    onRemove: (ThumbItem) -> Unit
-) {
+private fun ThumbnailGrid(thumbs: List<ThumbItem>, onRemove: (ThumbItem) -> Unit) {
     val columns = 3
     val rows = (thumbs.size + columns - 1) / columns
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (row in 0 until rows) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 for (col in 0 until columns) {
                     val index = row * columns + col
                     if (index < thumbs.size) {
-                        ThumbnailCell(
-                            thumb = thumbs[index],
-                            onRemove = onRemove,
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        Box(modifier = Modifier.weight(1f))
-                    }
+                        ThumbnailCell(thumbs[index], onRemove, Modifier.weight(1f))
+                    } else Box(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -345,38 +267,22 @@ private fun ThumbnailGrid(
 }
 
 @Composable
-private fun ThumbnailCell(
-    thumb: ThumbItem,
-    onRemove: (ThumbItem) -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun ThumbnailCell(thumb: ThumbItem, onRemove: (ThumbItem) -> Unit, modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+        modifier = modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
     ) {
         val model: Any? = if (thumb.isExisting) File(thumb.existingPath ?: "") else thumb.newUri
         AsyncImage(
             model = model,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(8.dp))
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
         )
         IconButton(
             onClick = { onRemove(thumb) },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(28.dp)
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape)
+            modifier = Modifier.align(Alignment.TopEnd).size(28.dp).background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Hapus screenshot",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(16.dp)
-            )
+            Icon(Icons.Filled.Close, contentDescription = "Hapus screenshot", modifier = Modifier.size(16.dp))
         }
     }
 }
