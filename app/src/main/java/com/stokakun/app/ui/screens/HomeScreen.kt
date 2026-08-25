@@ -58,7 +58,6 @@ fun HomeScreen(
     val reserved by viewModel.reservedCount.collectAsState()
     val sold by viewModel.soldCount.collectAsState()
     val recent by viewModel.recentAccounts.collectAsState()
-
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,13 +86,13 @@ fun HomeScreen(
             scope.launch {
                 runCatching {
                     val db = AppDatabase.getInstance(context)
-                    BackupManager.import(context, uri, db.accountDao(), db.screenshotDao())
+                    BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao())
                 }.onSuccess { success ->
                     snackbarHostState.showSnackbar(
-                        if (success) "Backup berhasil diimpor." else "Gagal membaca file backup."
+                        if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup."
                     )
                 }.onFailure {
-                    snackbarHostState.showSnackbar("Gagal mengimpor backup: ${it.message ?: "file tidak valid"}")
+                    snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}")
                 }
             }
         }
@@ -145,10 +144,7 @@ fun HomeScreen(
             }
             if (recent.isEmpty()) {
                 item {
-                    Text(
-                        "Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(recent, key = { it.id }) { account ->
@@ -156,9 +152,7 @@ fun HomeScreen(
                 StockCard(account, shotCount) { onAccountClick(account.id) }
             }
             item {
-                TextButton(onClick = { onSeeAllClick() }) {
-                    Text("Lihat semua stok")
-                }
+                TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") }
             }
         }
     }
