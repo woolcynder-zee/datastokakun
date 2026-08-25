@@ -85,25 +85,28 @@ fun HomeScreen(
     var exportPasswordConfirm by remember { mutableStateOf("") }
     var importPassword by remember { mutableStateOf("") }
     var pendingExportPassword by remember { mutableStateOf("") }
+    var backupBusy by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri == null) {
             pendingExportPassword = ""
+            backupBusy = false
             return@rememberLauncherForActivityResult
         }
         scope.launch {
             val password = pendingExportPassword
-            runCatching {
+            try {
                 val db = AppDatabase.getInstance(context)
                 BackupManager.export(context, uri, db.accountDao(), db.screenshotDao(), password)
-            }.onSuccess {
                 snackbarHostState.showSnackbar("Backup portable berhasil diekspor.")
-            }.onFailure {
-                snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}")
+            } catch (e: Throwable) {
+                snackbarHostState.showSnackbar("Gagal mengekspor backup: ${e.message ?: "kesalahan tidak diketahui"}")
+            } finally {
+                pendingExportPassword = ""
+                backupBusy = false
             }
-            pendingExportPassword = ""
         }
     }
 
@@ -112,22 +115,24 @@ fun HomeScreen(
     ) { uri ->
         if (uri == null) {
             importPassword = ""
+            backupBusy = false
             return@rememberLauncherForActivityResult
         }
         scope.launch {
             val password = importPassword.ifBlank { null }
-            runCatching {
+            try {
                 val db = AppDatabase.getInstance(context)
-                BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao(), password)
-            }.onSuccess { success ->
+                val success = BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao(), password)
                 snackbarHostState.showSnackbar(
                     if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati."
                     else "Gagal membaca file backup."
                 )
-            }.onFailure {
-                snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}")
+            } catch (e: Throwable) {
+                snackbarHostState.showSnackbar("Import dibatalkan: ${e.message ?: "file tidak valid"}")
+            } finally {
+                importPassword = ""
+                backupBusy = false
             }
-            importPassword = ""
         }
     }
 
@@ -135,15 +140,16 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(title = { Text("Stok Akun") }, actions = {
-                IconButton(onClick = onSettingsClick) { Icon(Icons.Filled.Settings, contentDescription = "Pengaturan") }
-                IconButton(onClick = onStorageClick) { Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan") }
-                IconButton(onClick = { showExportPassword = true }) { Icon(Icons.Filled.FileUpload, contentDescription = "Export backup") }
-                IconButton(onClick = { showImportPassword = true }) { Icon(Icons.Filled.FileDownload, contentDescription = "Import backup") }
+                IconButton(onClick = onSettingsClick, enabled = !backupBusy) { Icon(Icons.Filled.Settings, contentDescription = "Pengaturan") }
+                IconButton(onClick = onStorageClick, enabled = !backupBusy) { Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan") }
+                IconButton(onClick = { showExportPassword = true }, enabled = !backupBusy) { Icon(Icons.Filled.FileUpload, contentDescription = "Export backup") }
+                IconButton(onClick = { showImportPassword = true }, enabled = !backupBusy) { Icon(Icons.Filled.FileDownload, contentDescription = "Import backup") }
             })
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddClick,
+                enabled = !backupBusy,
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text("Tambah Akun") }
             )
@@ -189,13 +195,13 @@ fun HomeScreen(
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
                 StockCard(account = account, screenshotCount = shotCount, onClick = { onAccountClick(account.id) })
             }
-            item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
+            item { TextButton(onClick = onSeeAllClick, enabled = !backupBusy) { Text("Lihat semua stok") } }
         }
     }
 
     if (showExportPassword) {
         AlertDialog(
-            onDismissRequest = { showExportPassword = false },
+            onDismissRequest = { if (!backupBusy) showExportPassword = false },
             title = { Text("Backup Portable") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -228,6 +234,7 @@ fun HomeScreen(
                             exportPassword = ""
                             exportPasswordConfirm = ""
                             showExportPassword = false
+                            backupBusy = true
                             exportLauncher.launch("stok-akun-portable-backup.zip")
                         }
                     }
@@ -245,7 +252,7 @@ fun HomeScreen(
 
     if (showImportPassword) {
         AlertDialog(
-            onDismissRequest = { showImportPassword = false },
+            onDismissRequest = { if (!backupBusy) showImportPassword = false },
             title = { Text("Import Backup") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -263,6 +270,7 @@ fun HomeScreen(
             confirmButton = {
                 Button(onClick = {
                     showImportPassword = false
+                    backupBusy = true
                     importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
                 }) { Text("Pilih File") }
             },
