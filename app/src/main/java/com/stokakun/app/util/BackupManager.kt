@@ -97,6 +97,7 @@ object BackupManager {
         val tempDir = File(context.cacheDir, "backup_import_${UUID.randomUUID()}")
         require(tempDir.mkdirs()) { "Tidak dapat membuat folder sementara." }
         val copiedFiles = mutableListOf<String>()
+        val insertedAccountIds = mutableListOf<Long>()
         try {
             var metadataText: String? = null
             val extractedFiles = mutableMapOf<String, File>()
@@ -150,7 +151,6 @@ object BackupManager {
             val screenshotsJson = json.getJSONArray("screenshots")
             require(accountsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak akun." }
 
-            // Resolve duplicates and decrypt/prepare account data before the transaction.
             val idMap = mutableMapOf<Long, Long>()
             val accountData = mutableListOf<Pair<Long, AccountEntity?>>()
             for (i in 0 until accountsJson.length()) {
@@ -188,12 +188,15 @@ object BackupManager {
 
             database.withTransaction {
                 accountData.forEach { (oldId, account) ->
-                    if (account != null) idMap[oldId] = accountDao.insert(account)
+                    if (account != null) {
+                        val id = accountDao.insert(account)
+                        idMap[oldId] = id
+                        insertedAccountIds += id
+                    }
                 }
             }
 
-            // Copy screenshot files after account rows exist, outside the DB transaction.
-            val stagedScreenshots = mutableListOf<Pair<ScreenshotEntity, String>>()
+            val stagedScreenshots = mutableListOf<ScreenshotEntity>()
             for (i in 0 until screenshotsJson.length()) {
                 val s = screenshotsJson.getJSONObject(i)
                 val oldAccountId = s.getLong("accountId")
@@ -208,22 +211,25 @@ object BackupManager {
                     filePath = newPath,
                     createdAt = s.getLong("createdAt"),
                     sortOrder = s.getInt("sortOrder")
-                ) to newPath
+                )
             }
 
-            try {
-                database.withTransaction {
-                    if (stagedScreenshots.isNotEmpty()) {
-                        screenshotDao.insertAll(stagedScreenshots.map { it.first })
-                    }
+            database.withTransaction {
+                if (stagedScreenshots.isNotEmpty()) {
+                    screenshotDao.insertAll(stagedScreenshots)
                 }
-            } catch (e: Exception) {
-                // Account rows may have been inserted already; image cleanup is still safe.
-                throw e
             }
 
             return true
         } catch (e: Exception) {
+            if (insertedAccountIds.isNotEmpty()) {
+                runCatching {
+                    database.withTransaction {
+                        screenshotDao.deleteAllForAccounts(insertedAccountIds)
+                        accountDao.getByIds(insertedAccountIds).forEach { accountDao.delete(it) }
+                    }
+                }
+            }
             ImageStorageManager.deleteFiles(copiedFiles)
             throw e
         } finally {
