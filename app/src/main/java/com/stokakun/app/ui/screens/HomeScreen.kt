@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.stokakun.app.data.AppDatabase
+import com.stokakun.app.data.GameStat
 import com.stokakun.app.ui.components.StockCard
 import com.stokakun.app.ui.components.formatPrice
 import com.stokakun.app.util.BackupManager
@@ -57,6 +58,7 @@ fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountCli
     val sold by viewModel.soldCount.collectAsState()
     val activeValue by viewModel.activeStockValue.collectAsState()
     val soldValue by viewModel.soldStockValue.collectAsState()
+    val gameStats by viewModel.gameStats.collectAsState()
     val recent by viewModel.recentAccounts.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -92,6 +94,11 @@ fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountCli
             item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Total Stok", value = total.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Available", value = available.toString(), modifier = Modifier.weight(1f)) } }
             item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Reserved", value = reserved.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Sold", value = sold.toString(), modifier = Modifier.weight(1f)) } }
             item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Nilai Terjual", value = formatPrice(soldValue), modifier = Modifier.weight(1f)); SummaryCard(label = "Akun Terjual", value = sold.toString(), modifier = Modifier.weight(1f)) } }
+            if (gameStats.isNotEmpty()) {
+                item { Text("Stok per Game", style = MaterialTheme.typography.titleMedium) }
+                items(gameStats.take(8), key = { it.game }) { stat -> GameStatCard(stat) }
+                if (gameStats.size > 8) item { Text("+ ${gameStats.size - 8} game lainnya", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
             item { Spacer(modifier = Modifier.height(4.dp)); Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium) }
             if (recent.isEmpty()) item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(recent, key = { it.id }) { account ->
@@ -107,5 +114,16 @@ fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountCli
 private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(modifier = modifier, shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(14.dp)) { Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary); Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@Composable
+private fun GameStatCard(stat: GameStat) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stat.game, style = MaterialTheme.typography.titleMedium)
+            Text("${stat.total} akun • ${stat.available} available • ${stat.reserved} reserved • ${stat.sold} sold", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Nilai aktif: ${formatPrice(stat.activeValue)}", color = MaterialTheme.colorScheme.primary)
+        }
     }
 }
