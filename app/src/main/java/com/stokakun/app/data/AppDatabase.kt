@@ -13,7 +13,6 @@ import androidx.room.TypeConverters
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
-
     abstract fun accountDao(): AccountDao
     abstract fun screenshotDao(): ScreenshotDao
 
@@ -27,10 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "stok_akun.db"
-                )
-                    .fallbackToDestructiveMigrationOnDowngrade()
-                    .build()
-                    .also { INSTANCE = it }
+                ).build().also { INSTANCE = it }
             }
         }
     }
