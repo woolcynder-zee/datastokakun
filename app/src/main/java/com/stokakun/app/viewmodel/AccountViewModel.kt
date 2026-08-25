@@ -60,9 +60,21 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         SortOption.PRICE_LOW -> accounts.sortedBy { it.price }
     }
 
-    fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-    fun accountFlow(id: Long): StateFlow<AccountEntity?> = repository.getAccountById(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = repository.getScreenshots(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val screenshotCountCache = mutableMapOf<Long, StateFlow<Int>>()
+    private val accountFlowCache = mutableMapOf<Long, StateFlow<AccountEntity?>>()
+    private val screenshotsFlowCache = mutableMapOf<Long, StateFlow<List<ScreenshotEntity>>>()
+
+    fun screenshotCount(accountId: Long): StateFlow<Int> = screenshotCountCache.getOrPut(accountId) {
+        repository.getScreenshotCount(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    }
+
+    fun accountFlow(id: Long): StateFlow<AccountEntity?> = accountFlowCache.getOrPut(id) {
+        repository.getAccountById(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }
+
+    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = screenshotsFlowCache.getOrPut(accountId) {
+        repository.getScreenshots(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
 
     /** Returns null when the Android Keystore key is unavailable/corrupted instead of crashing Compose. */
     fun decryptPasswordOrNull(encrypted: String): String? = runCatching { repository.decryptPassword(encrypted) }.getOrNull()
@@ -84,6 +96,13 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
 
     fun bulkDelete(ids: Set<Long>, onDone: (Int) -> Unit, onError: (Throwable) -> Unit = {}) {
         viewModelScope.launch { runCatching { repository.bulkDelete(ids.toList()) }.onSuccess(onDone).onFailure(onError) }
+    }
+
+    override fun onCleared() {
+        screenshotCountCache.clear()
+        accountFlowCache.clear()
+        screenshotsFlowCache.clear()
+        super.onCleared()
     }
 
     class Factory(private val repository: AccountRepository) : ViewModelProvider.Factory {
