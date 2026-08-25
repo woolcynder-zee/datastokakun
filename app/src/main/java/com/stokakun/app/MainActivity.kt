@@ -49,7 +49,9 @@ class MainActivity : ComponentActivity() {
                         StokAkunNavGraph(viewModel = viewModel)
                     } else {
                         LockScreen { pin ->
-                            if (lockManager.verifyPin(pin)) unlocked = true
+                            val verified = lockManager.verifyPin(pin)
+                            if (verified) unlocked = true
+                            verified
                         }
                     }
                 }
