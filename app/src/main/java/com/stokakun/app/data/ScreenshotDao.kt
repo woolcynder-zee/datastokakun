@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScreenshotDao {
-
     @Query("SELECT * FROM screenshots WHERE accountId = :accountId ORDER BY sortOrder ASC")
     fun getForAccount(accountId: Long): Flow<List<ScreenshotEntity>>
 
@@ -17,6 +16,9 @@ interface ScreenshotDao {
 
     @Query("SELECT * FROM screenshots WHERE accountId = :accountId ORDER BY sortOrder ASC")
     suspend fun getForAccountOnce(accountId: Long): List<ScreenshotEntity>
+
+    @Query("SELECT * FROM screenshots WHERE accountId IN (:accountIds) ORDER BY accountId ASC, sortOrder ASC")
+    suspend fun getForAccountsOnce(accountIds: List<Long>): List<ScreenshotEntity>
 
     @Insert
     suspend fun insert(screenshot: ScreenshotEntity): Long
