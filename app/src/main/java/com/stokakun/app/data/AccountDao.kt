@@ -48,4 +48,7 @@ interface AccountDao {
 
     @Query("SELECT * FROM accounts WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<Long>): List<AccountEntity>
+
+    @Query("SELECT * FROM accounts WHERE username = :username LIMIT 1")
+    suspend fun findByUsername(username: String): AccountEntity?
 }
