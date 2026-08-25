@@ -25,6 +25,7 @@ class AccountRepository(
     fun getTotalCount(): Flow<Int> = accountDao.getTotalCount()
     fun getCountByStatus(status: AccountStatus): Flow<Int> = accountDao.getCountByStatus(status.name)
     fun getActiveStockValue(): Flow<Long> = accountDao.getActiveStockValue()
+    fun getSoldStockValue(): Flow<Long> = accountDao.getSoldStockValue()
     fun getScreenshots(accountId: Long): Flow<List<ScreenshotEntity>> = screenshotDao.getForAccount(accountId)
     fun getScreenshotCount(accountId: Long): Flow<Int> = screenshotDao.getCountForAccount(accountId)
     fun decryptPassword(encrypted: String): String = CryptoManager.decrypt(encrypted)
