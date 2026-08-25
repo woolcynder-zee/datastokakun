@@ -8,23 +8,29 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.stokakun.app.data.AppDatabase
 import com.stokakun.app.ui.screens.AddEditAccountScreen
 import com.stokakun.app.ui.screens.DetailScreen
 import com.stokakun.app.ui.screens.FullscreenImageScreen
 import com.stokakun.app.ui.screens.HomeScreen
 import com.stokakun.app.ui.screens.StockListScreen
+import com.stokakun.app.ui.screens.StorageScreen
 import com.stokakun.app.viewmodel.AccountViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StokAkunNavGraph(viewModel: AccountViewModel) {
     val navController: NavHostController = rememberNavController()
+    val context = androidx.compose.ui.platform.LocalContext.current
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
-            HomeScreen(viewModel, { navController.navigate(Routes.ADD) }, { id -> navController.navigate(Routes.detail(id)) }, { navController.navigate(Routes.LIST) })
+            HomeScreen(viewModel, { navController.navigate(Routes.ADD) }, { id -> navController.navigate(Routes.detail(id)) }, { navController.navigate(Routes.LIST) }, { navController.navigate(Routes.STORAGE) })
         }
         composable(Routes.LIST) {
             StockListScreen(viewModel, { id -> navController.navigate(Routes.detail(id)) }, { navController.popBackStack() })
+        }
+        composable(Routes.STORAGE) {
+            StorageScreen(AppDatabase.getInstance(context).screenshotDao(), context, { navController.popBackStack() })
         }
         composable(Routes.ADD) {
             AddEditAccountScreen(viewModel, null, { navController.popBackStack() }, { navController.popBackStack() })
