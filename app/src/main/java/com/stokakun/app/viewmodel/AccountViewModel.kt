@@ -38,14 +38,31 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         .flatMapLatest { (query, status) -> repository.getFiltered(status, query) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    // Cache StateFlow instances per account ID to prevent memory leaks
+    private val screenshotCountCache = mutableMapOf<Long, StateFlow<Int>>()
+    private val accountFlowCache = mutableMapOf<Long, StateFlow<AccountEntity?>>()
+    private val screenshotsFlowCache = mutableMapOf<Long, StateFlow<List<ScreenshotEntity>>>()
 
-    fun accountFlow(id: Long): StateFlow<AccountEntity?> = repository.getAccountById(id)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    fun screenshotCount(accountId: Long): StateFlow<Int> {
+        return screenshotCountCache.getOrPut(accountId) {
+            repository.getScreenshotCount(accountId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        }
+    }
 
-    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = repository.getScreenshots(accountId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    fun accountFlow(id: Long): StateFlow<AccountEntity?> {
+        return accountFlowCache.getOrPut(id) {
+            repository.getAccountById(id)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        }
+    }
+
+    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> {
+        return screenshotsFlowCache.getOrPut(accountId) {
+            repository.getScreenshots(accountId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }
+    }
 
     fun decryptPassword(encrypted: String): String = repository.decryptPassword(encrypted)
 
@@ -67,6 +84,13 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         viewModelScope.launch {
             runCatching { repository.deleteAccount(account) }.onSuccess { onDone() }.onFailure(onError)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        screenshotCountCache.clear()
+        accountFlowCache.clear()
+        screenshotsFlowCache.clear()
     }
 
     class Factory(private val repository: AccountRepository) : ViewModelProvider.Factory {
