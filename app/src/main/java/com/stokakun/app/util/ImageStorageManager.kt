@@ -6,13 +6,13 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Screenshots are copied as real JPEG/PNG files into app-private internal
- * storage (filesDir/screenshots). Only the file path is stored in Room -
- * no Base64, no blobs.
+ * Screenshots are copied as real JPEG/PNG/WebP files into app-private
+ * internal storage. Only the file path is stored in Room.
  */
 object ImageStorageManager {
 
     private const val FOLDER_NAME = "screenshots"
+    private const val MAX_IMAGE_BYTES = 25L * 1024L * 1024L
 
     private fun screenshotsDir(context: Context): File {
         val dir = File(context.filesDir, FOLDER_NAME)
@@ -20,39 +20,48 @@ object ImageStorageManager {
         return dir
     }
 
-    /**
-     * Copies the content:// image at [sourceUri] into app-private storage
-     * and returns the absolute path of the new file, or null on failure.
-     */
     fun copyImageToLocalStorage(context: Context, sourceUri: Uri): String? {
+        var destFile: File? = null
         return try {
             val extension = guessExtension(context, sourceUri)
-            val fileName = "${UUID.randomUUID()}.$extension"
-            val destFile = File(screenshotsDir(context), fileName)
+            val file = File(screenshotsDir(context), "${UUID.randomUUID()}.$extension")
+            destFile = file
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
-                destFile.outputStream().use { output ->
-                    input.copyTo(output)
+                file.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var total = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        total += read
+                        require(total <= MAX_IMAGE_BYTES) { "Ukuran screenshot terlalu besar. Maksimal 25 MB per gambar." }
+                        output.write(buffer, 0, read)
+                    }
                 }
             } ?: return null
-            destFile.absolutePath
-        } catch (e: Exception) {
+            file.absolutePath
+        } catch (_: Exception) {
+            destFile?.delete()
             null
         }
     }
 
-    /**
-     * Copies an already-local file (e.g. extracted from a backup zip) into
-     * app-private storage under a fresh unique name. Used by BackupManager.
-     */
     fun copyLocalFileToStorage(context: Context, sourceFile: File): String? {
+        var destFile: File? = null
         return try {
+            require(sourceFile.isFile) { "File screenshot tidak valid." }
+            require(sourceFile.length() <= MAX_IMAGE_BYTES) { "Ukuran screenshot terlalu besar. Maksimal 25 MB per gambar." }
             val extension = sourceFile.extension.ifBlank { "jpg" }
-            val destFile = File(screenshotsDir(context), "${UUID.randomUUID()}.$extension")
+            val file = File(screenshotsDir(context), "${UUID.randomUUID()}.$extension")
+            destFile = file
             sourceFile.inputStream().use { input ->
-                destFile.outputStream().use { output -> input.copyTo(output) }
+                file.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
-            destFile.absolutePath
-        } catch (e: Exception) {
+            file.absolutePath
+        } catch (_: Exception) {
+            destFile?.delete()
             null
         }
     }
@@ -76,6 +85,6 @@ object ImageStorageManager {
     }
 
     fun deleteFiles(paths: List<String>) {
-        paths.forEach { deleteFile(it) }
+        paths.forEach(::deleteFile)
     }
 }
