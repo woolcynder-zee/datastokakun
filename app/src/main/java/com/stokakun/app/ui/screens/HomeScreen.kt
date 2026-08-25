@@ -138,7 +138,7 @@ fun HomeScreen(
             }
             items(recent, key = { it.id }) { account ->
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
-                StockCard(account, shotCount) { onAccountClick(account.id) }
+                StockCard(account, shotCount, { onAccountClick(account.id) })
             }
             item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
         }
