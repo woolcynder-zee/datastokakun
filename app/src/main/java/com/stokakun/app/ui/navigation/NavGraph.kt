@@ -1,6 +1,8 @@
 package com.stokakun.app.ui.navigation
 
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -30,19 +32,27 @@ fun StokAkunNavGraph(viewModel: AccountViewModel) {
             AddEditAccountScreen(viewModel, null, { navController.popBackStack() }, { navController.popBackStack() })
         }
         composable(Routes.EDIT, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            AddEditAccountScreen(viewModel, accountId, { navController.popBackStack() }, { navController.popBackStack() })
+            val accountId = entry.arguments?.getLong("accountId")
+            if (accountId != null && accountId > 0) {
+                AddEditAccountScreen(viewModel, accountId, { navController.popBackStack() }, { navController.popBackStack() })
+            } else {
+                navController.popBackStack()
+            }
         }
         composable(Routes.DETAIL, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            DetailScreen(
-                viewModel = viewModel,
-                accountId = accountId,
-                onBack = { navController.popBackStack() },
-                onEdit = { id -> navController.navigate(Routes.edit(id)) },
-                onDeleted = { navController.popBackStack() },
-                onImageClick = { id, index -> navController.navigate(Routes.fullscreen(id, index)) }
-            )
+            val accountId = entry.arguments?.getLong("accountId")
+            if (accountId != null && accountId > 0) {
+                DetailScreen(
+                    viewModel = viewModel,
+                    accountId = accountId,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { id -> navController.navigate(Routes.edit(id)) },
+                    onDeleted = { navController.popBackStack() },
+                    onImageClick = { id, index -> navController.navigate(Routes.fullscreen(id, index)) }
+                )
+            } else {
+                navController.popBackStack()
+            }
         }
         composable(
             Routes.FULLSCREEN,
@@ -51,13 +61,18 @@ fun StokAkunNavGraph(viewModel: AccountViewModel) {
                 navArgument("index") { type = NavType.IntType }
             )
         ) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            FullscreenImageScreen(
-                viewModel = viewModel,
-                accountId = accountId,
-                initialIndex = entry.arguments?.getInt("index") ?: 0,
-                onBack = { navController.popBackStack() }
-            )
+            val accountId = entry.arguments?.getLong("accountId")
+            val index = entry.arguments?.getInt("index") ?: 0
+            if (accountId != null && accountId > 0) {
+                FullscreenImageScreen(
+                    viewModel = viewModel,
+                    accountId = accountId,
+                    initialIndex = index,
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                navController.popBackStack()
+            }
         }
     }
 }
