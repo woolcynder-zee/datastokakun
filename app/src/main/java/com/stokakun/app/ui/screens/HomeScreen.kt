@@ -34,10 +34,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -157,7 +155,11 @@ fun HomeScreen(
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
                 StockCard(account, shotCount) { onAccountClick(account.id) }
             }
-            item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
+            item {
+                TextButton(onClick = { onSeeAllClick() }) {
+                    Text("Lihat semua stok")
+                }
+            }
         }
     }
 }
