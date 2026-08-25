@@ -55,6 +55,7 @@ import com.stokakun.app.ui.components.StatusBadge
 import com.stokakun.app.ui.components.formatPrice
 import com.stokakun.app.viewmodel.AccountViewModel
 import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,14 +79,16 @@ fun DetailScreen(
 
     fun copyText(label: String, value: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+        val copyToken = UUID.randomUUID().toString()
+        val clipboardLabel = "StokAkun:$label:$copyToken"
+        clipboard.setPrimaryClip(ClipData.newPlainText(clipboardLabel, value))
         scope.launch {
             snackbarHostState.showSnackbar("$label disalin. Clipboard akan dibersihkan otomatis.")
             delay(30_000)
             runCatching {
                 val current = clipboard.primaryClip
-                val currentText = current?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-                if (currentText == value) clipboard.clearPrimaryClip()
+                val currentLabel = current?.description?.label?.toString()
+                if (currentLabel == clipboardLabel) clipboard.clearPrimaryClip()
             }
         }
     }
