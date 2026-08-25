@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -84,15 +85,9 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
                         androidx.compose.foundation.layout.Box {
                             IconButton(onClick = { showBulkMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Aksi massal") }
                             DropdownMenu(expanded = showBulkMenu, onDismissRequest = { showBulkMenu = false }) {
-                                DropdownMenuItem(text = { Text("Tandai Available") }, onClick = {
-                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.AVAILABLE, { count -> clearSelection(); showBulkMenu = false }, { showBulkMenu = false })
-                                })
-                                DropdownMenuItem(text = { Text("Tandai Reserved") }, onClick = {
-                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.RESERVED, { count -> clearSelection(); showBulkMenu = false }, { showBulkMenu = false })
-                                })
-                                DropdownMenuItem(text = { Text("Tandai Sold") }, onClick = {
-                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.SOLD, { count -> clearSelection(); showBulkMenu = false }, { showBulkMenu = false })
-                                })
+                                DropdownMenuItem(text = { Text("Tandai Available") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.AVAILABLE, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
+                                DropdownMenuItem(text = { Text("Tandai Reserved") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.RESERVED, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
+                                DropdownMenuItem(text = { Text("Tandai Sold") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.SOLD, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
                                 DropdownMenuItem(text = { Text("Hapus yang dipilih") }, onClick = { showBulkMenu = false; showDeleteConfirm = true })
                             }
                         }
@@ -121,9 +116,14 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
                     FilterChip(
                         selected = account.id in selectedIds,
                         onClick = { selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id },
-                        label = { Icon(if (account.id in selectedIds) Icons.Filled.Done else Icons.Filled.Done, contentDescription = null) }
+                        label = { Text(if (account.id in selectedIds) "✓" else "○") }
                     )
-                    StockCard(account, shotCount) { if (selectedIds.isEmpty()) onAccountClick(account.id) else selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id }
+                    StockCard(
+                        account,
+                        shotCount,
+                        { if (selectedIds.isEmpty()) onAccountClick(account.id) else selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id },
+                        Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -134,11 +134,7 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Hapus ${selectedIds.size} akun?") },
             text = { Text("Akun yang dipilih beserta screenshot-nya akan dihapus dan tidak bisa dibatalkan.") },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.bulkDelete(selectedIds, { count -> clearSelection(); showDeleteConfirm = false }, { showDeleteConfirm = false })
-                }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") }
-            },
+            confirmButton = { Button(onClick = { viewModel.bulkDelete(selectedIds, { clearSelection(); showDeleteConfirm = false }, { showDeleteConfirm = false }) }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") } },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
         )
     }
