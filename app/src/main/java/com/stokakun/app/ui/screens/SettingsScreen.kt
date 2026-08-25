@@ -24,8 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.stokakun.app.util.AppLockManager
 
@@ -33,7 +33,8 @@ import com.stokakun.app.util.AppLockManager
 @Composable
 fun SettingsScreen(lockManager: AppLockManager, onBack: () -> Unit) {
     var enabled by remember { mutableStateOf(lockManager.isEnabled) }
-    var showDialog by remember { mutableStateOf(false) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var showDisableDialog by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
@@ -60,17 +61,25 @@ fun SettingsScreen(lockManager: AppLockManager, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!enabled) {
-                Button(onClick = { pin = ""; confirm = ""; error = ""; showDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Aktifkan App Lock") }
+                Button(
+                    onClick = { pin = ""; confirm = ""; error = ""; showPinDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Aktifkan App Lock") }
             } else {
-                Button(onClick = { lockManager.clearPin(); enabled = false }, modifier = Modifier.fillMaxWidth()) { Text("Matikan App Lock") }
-                TextButton(onClick = { pin = ""; confirm = ""; error = ""; showDialog = true }) { Text("Ganti PIN") }
+                Button(
+                    onClick = { showDisableDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Matikan App Lock") }
+                TextButton(
+                    onClick = { pin = ""; confirm = ""; error = ""; showPinDialog = true }
+                ) { Text("Ganti PIN") }
             }
         }
     }
 
-    if (showDialog) {
+    if (showPinDialog) {
         AlertDialog(
-            onDismissRequest = { showDialog = false },
+            onDismissRequest = { showPinDialog = false },
             title = { Text(if (enabled) "Ganti PIN" else "Buat PIN") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,11 +105,31 @@ fun SettingsScreen(lockManager: AppLockManager, onBack: () -> Unit) {
                     when {
                         pin.length !in 4..8 -> error = "PIN harus 4–8 digit."
                         pin != confirm -> error = "Konfirmasi PIN tidak cocok."
-                        else -> { lockManager.setPin(pin); enabled = true; showDialog = false }
+                        else -> {
+                            lockManager.setPin(pin)
+                            enabled = true
+                            showPinDialog = false
+                        }
                     }
                 }) { Text("Simpan") }
             },
-            dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Batal") } }
+            dismissButton = { TextButton(onClick = { showPinDialog = false }) { Text("Batal") } }
+        )
+    }
+
+    if (showDisableDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableDialog = false },
+            title = { Text("Matikan App Lock?") },
+            text = { Text("Proteksi PIN akan dimatikan dan aplikasi tidak lagi meminta PIN saat dibuka kembali.") },
+            confirmButton = {
+                Button(onClick = {
+                    lockManager.clearPin()
+                    enabled = false
+                    showDisableDialog = false
+                }) { Text("Matikan") }
+            },
+            dismissButton = { TextButton(onClick = { showDisableDialog = false }) { Text("Batal") } }
         )
     }
 }
