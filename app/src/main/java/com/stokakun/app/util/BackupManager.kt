@@ -38,7 +38,7 @@ object BackupManager {
         val accountsJson = JSONArray()
         accounts.forEach { acc ->
             val plainPassword = runCatching { CryptoManager.decrypt(acc.passwordEncrypted) }
-                .getOrElse { throw IllegalArgumentException("Tidak bisa membaca password akun ${acc.name}. Pastikan aplikasi masih berada di instalasi yang menyimpan data asli.") }
+                .getOrElse { throw IllegalArgumentException("Tidak bisa membaca password akun ${acc.name}. Pastikan data masih berada di instalasi asli.") }
             accountsJson.put(JSONObject().apply {
                 put("id", acc.id)
                 put("game", acc.game)
@@ -164,18 +164,10 @@ object BackupManager {
                         continue
                     }
                     val passwordEncrypted = if (version == FORMAT_VERSION) {
-                        PortableBackupCrypto.encrypt(
-                            PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!),
-                            "local-import-placeholder"
-                        )
-                    } else {
-                        a.getString("passwordEncrypted")
-                    }
-                    val restoredPassword = if (version == FORMAT_VERSION) {
                         val plain = PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!)
                         CryptoManager.encrypt(plain)
                     } else {
-                        passwordEncrypted
+                        a.getString("passwordEncrypted")
                     }
                     val newId = accountDao.insert(AccountEntity(
                         game = game,
@@ -183,7 +175,7 @@ object BackupManager {
                         price = a.getLong("price").coerceAtLeast(0L),
                         status = AccountStatus.valueOf(a.getString("status")),
                         username = username,
-                        passwordEncrypted = restoredPassword,
+                        passwordEncrypted = passwordEncrypted,
                         notes = a.getString("notes"),
                         createdAt = a.getLong("createdAt")
                     ))
