@@ -27,7 +27,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "stok_akun.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .fallbackToDestructiveMigrationOnDowngrade()
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }
