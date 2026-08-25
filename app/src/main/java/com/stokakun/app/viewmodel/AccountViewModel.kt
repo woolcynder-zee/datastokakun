@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,14 +30,26 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     val searchQuery: StateFlow<String> = _searchQuery
     private val _statusFilter = MutableStateFlow<AccountStatus?>(null)
     val statusFilter: StateFlow<AccountStatus?> = _statusFilter
+    private val _sort = MutableStateFlow(SortOption.NEWEST)
+    val sort: StateFlow<SortOption> = _sort
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
     fun setStatusFilter(status: AccountStatus?) { _statusFilter.value = status }
+    fun setSort(option: SortOption) { _sort.value = option }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val filteredAccounts: StateFlow<List<AccountEntity>> = combine(_searchQuery, _statusFilter) { query, status -> query to status }
-        .flatMapLatest { (query, status) -> repository.getFiltered(status, query) }
+    val filteredAccounts: StateFlow<List<AccountEntity>> = combine(_searchQuery, _statusFilter, _sort) { query, status, sort -> Triple(query, status, sort) }
+        .flatMapLatest { (query, status, sort) -> repository.getFiltered(status, query).map { sortAccounts(it, sort) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun sortAccounts(accounts: List<AccountEntity>, sort: SortOption): List<AccountEntity> = when (sort) {
+        SortOption.NEWEST -> accounts.sortedByDescending { it.createdAt }
+        SortOption.OLDEST -> accounts.sortedBy { it.createdAt }
+        SortOption.NAME_AZ -> accounts.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        SortOption.NAME_ZA -> accounts.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.name })
+        SortOption.PRICE_HIGH -> accounts.sortedByDescending { it.price }
+        SortOption.PRICE_LOW -> accounts.sortedBy { it.price }
+    }
 
     fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -73,4 +86,13 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T = AccountViewModel(repository) as T
     }
+}
+
+enum class SortOption(val label: String) {
+    NEWEST("Terbaru"),
+    OLDEST("Terlama"),
+    NAME_AZ("Nama A–Z"),
+    NAME_ZA("Nama Z–A"),
+    PRICE_HIGH("Harga tertinggi"),
+    PRICE_LOW("Harga terendah")
 }
