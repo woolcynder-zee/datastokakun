@@ -24,6 +24,7 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     val reservedCount = repository.getCountByStatus(AccountStatus.RESERVED).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val soldCount = repository.getCountByStatus(AccountStatus.SOLD).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val activeStockValue = repository.getActiveStockValue().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    val soldStockValue = repository.getSoldStockValue().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
     val recentAccounts = repository.getRecent(5).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
