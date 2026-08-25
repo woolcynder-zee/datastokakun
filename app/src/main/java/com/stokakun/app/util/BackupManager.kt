@@ -18,55 +18,35 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 object BackupManager {
-
     private const val METADATA_FILE = "metadata.json"
     private const val SCREENSHOTS_FOLDER = "screenshots"
     private const val FORMAT_VERSION = 1
     private const val MAX_ENTRIES = 2000
     private const val MAX_UNCOMPRESSED_BYTES = 512L * 1024L * 1024L
 
-    suspend fun export(
-        context: Context,
-        destUri: Uri,
-        accountDao: AccountDao,
-        screenshotDao: ScreenshotDao
-    ) {
+    suspend fun export(context: Context, destUri: Uri, accountDao: AccountDao, screenshotDao: ScreenshotDao) {
         val accounts = accountDao.getAllOnce()
         val screenshots = screenshotDao.getAllOnce()
         val accountsJson = JSONArray()
         accounts.forEach { acc ->
             accountsJson.put(JSONObject().apply {
-                put("id", acc.id)
-                put("game", acc.game)
-                put("name", acc.name)
-                put("price", acc.price)
-                put("status", acc.status.name)
-                put("username", acc.username)
-                put("passwordEncrypted", acc.passwordEncrypted)
-                put("notes", acc.notes)
-                put("createdAt", acc.createdAt)
+                put("id", acc.id); put("game", acc.game); put("name", acc.name); put("price", acc.price)
+                put("status", acc.status.name); put("username", acc.username); put("passwordEncrypted", acc.passwordEncrypted)
+                put("notes", acc.notes); put("createdAt", acc.createdAt)
             })
         }
-
         val screenshotsJson = JSONArray()
         screenshots.forEach { shot ->
             val file = File(shot.filePath)
             if (!file.exists() || !file.isFile) return@forEach
-            val zipEntryName = "$SCREENSHOTS_FOLDER/${file.name}"
             screenshotsJson.put(JSONObject().apply {
-                put("accountId", shot.accountId)
-                put("zipEntry", zipEntryName)
-                put("createdAt", shot.createdAt)
-                put("sortOrder", shot.sortOrder)
+                put("accountId", shot.accountId); put("zipEntry", "$SCREENSHOTS_FOLDER/${file.name}")
+                put("createdAt", shot.createdAt); put("sortOrder", shot.sortOrder)
             })
         }
-
         val root = JSONObject().apply {
-            put("version", FORMAT_VERSION)
-            put("accounts", accountsJson)
-            put("screenshots", screenshotsJson)
+            put("version", FORMAT_VERSION); put("accounts", accountsJson); put("screenshots", screenshotsJson)
         }
-
         context.contentResolver.openOutputStream(destUri)?.use { out ->
             ZipOutputStream(out).use { zip ->
                 zip.putNextEntry(ZipEntry(METADATA_FILE))
@@ -99,7 +79,6 @@ object BackupManager {
             val extractedFiles = mutableMapOf<String, File>()
             var entryCount = 0
             var totalBytes = 0L
-
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
                 ZipInputStream(input).use { zip ->
                     var entry: ZipEntry? = zip.nextEntry
@@ -108,9 +87,7 @@ object BackupManager {
                         require(entryCount <= MAX_ENTRIES) { "Backup berisi terlalu banyak file." }
                         if (!entry.isDirectory) {
                             val name = entry.name
-                            require(name == METADATA_FILE || isSafeScreenshotEntry(name)) {
-                                "Backup memiliki path/file yang tidak valid."
-                            }
+                            require(name == METADATA_FILE || isSafeScreenshotEntry(name)) { "Backup memiliki path/file yang tidak valid." }
                             if (name == METADATA_FILE) {
                                 val bytes = zip.readBytes()
                                 totalBytes += bytes.size
@@ -146,6 +123,7 @@ object BackupManager {
             require(accountsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak akun." }
 
             val idMap = mutableMapOf<Long, Long>()
+            val newlyInsertedOldIds = mutableSetOf<Long>()
             database.withTransaction {
                 for (i in 0 until accountsJson.length()) {
                     val a = accountsJson.getJSONObject(i)
@@ -170,11 +148,14 @@ object BackupManager {
                         createdAt = a.getLong("createdAt")
                     ))
                     idMap[oldId] = newId
+                    newlyInsertedOldIds += oldId
                 }
 
                 for (i in 0 until screenshotsJson.length()) {
                     val s = screenshotsJson.getJSONObject(i)
-                    val newAccountId = idMap[s.getLong("accountId")] ?: continue
+                    val oldAccountId = s.getLong("accountId")
+                    if (oldAccountId !in newlyInsertedOldIds) continue
+                    val newAccountId = idMap[oldAccountId] ?: continue
                     val zipEntry = s.getString("zipEntry")
                     val sourceFile = extractedFiles[zipEntry] ?: continue
                     val newPath = ImageStorageManager.copyLocalFileToStorage(context, sourceFile)
