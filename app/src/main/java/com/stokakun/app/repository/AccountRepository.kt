@@ -5,9 +5,9 @@ import android.net.Uri
 import com.stokakun.app.data.AccountDao
 import com.stokakun.app.data.AccountEntity
 import com.stokakun.app.data.AccountStatus
-import com.stokakun.app.data.CryptoManager
 import com.stokakun.app.data.ScreenshotDao
 import com.stokakun.app.data.ScreenshotEntity
+import com.stokakun.app.util.CryptoManager
 import com.stokakun.app.util.ImageStorageManager
 import kotlinx.coroutines.flow.Flow
 
@@ -28,8 +28,7 @@ class AccountRepository(
 
     fun getCountByStatus(status: AccountStatus): Flow<Int> = accountDao.getCountByStatus(status.name)
 
-    fun getScreenshots(accountId: Long): Flow<List<ScreenshotEntity>> =
-        screenshotDao.getForAccount(accountId)
+    fun getScreenshots(accountId: Long): Flow<List<ScreenshotEntity>> = screenshotDao.getForAccount(accountId)
 
     fun getScreenshotCount(accountId: Long): Flow<Int> = screenshotDao.getCountForAccount(accountId)
 
@@ -49,12 +48,9 @@ class AccountRepository(
         newImageUris: List<Uri>,
         removedScreenshotIds: List<Long>
     ): Long {
-        // When editing, preserve the existing ciphertext if the password field was
-        // not changed. This prevents an unavailable/invalid Keystore key from
-        // silently replacing a real password with an empty one.
         val encryptedPassword = passwordEncryptedOverride ?: CryptoManager.encrypt(plainPassword)
 
-        val accountId: Long = if (existingId == null) {
+        val accountId = if (existingId == null) {
             accountDao.insert(
                 AccountEntity(
                     game = game,
@@ -84,18 +80,14 @@ class AccountRepository(
             existingId
         }
 
-        // Remove screenshots that the user deleted during editing.
         if (removedScreenshotIds.isNotEmpty()) {
             val all = screenshotDao.getForAccountOnce(accountId)
-            val toRemove = all.filter { it.id in removedScreenshotIds }
-            toRemove.forEach { shot ->
+            all.filter { it.id in removedScreenshotIds }.forEach { shot ->
                 ImageStorageManager.deleteFile(shot.filePath)
                 screenshotDao.delete(shot)
             }
         }
 
-        // Add newly picked screenshots as real files. Continue numbering after
-        // the current maximum so deleting an earlier image cannot create ties.
         if (newImageUris.isNotEmpty()) {
             val nextSortOrder = screenshotDao.getForAccountOnce(accountId)
                 .maxOfOrNull { it.sortOrder }
@@ -112,9 +104,7 @@ class AccountRepository(
                     sortOrder = nextSortOrder + index
                 )
             }
-            if (newEntities.isNotEmpty()) {
-                screenshotDao.insertAll(newEntities)
-            }
+            if (newEntities.isNotEmpty()) screenshotDao.insertAll(newEntities)
         }
 
         return accountId
