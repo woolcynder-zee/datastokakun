@@ -1,0 +1,89 @@
+name: Fix Android Project Structure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rebuild Android project structure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p \
+            app/src/main/java/com/stokakun/app/data \
+            app/src/main/java/com/stokakun/app/repository \
+            app/src/main/java/com/stokakun/app/ui/components \
+            app/src/main/java/com/stokakun/app/ui/navigation \
+            app/src/main/java/com/stokakun/app/ui/screens \
+            app/src/main/java/com/stokakun/app/ui/theme \
+            app/src/main/java/com/stokakun/app/util \
+            app/src/main/java/com/stokakun/app/viewmodel \
+            app/src/main/res/mipmap-mdpi \
+            app/src/main/res/values \
+            gradle/wrapper
+
+          mv AccountDao.kt app/src/main/java/com/stokakun/app/data/AccountDao.kt
+          mv AccountEntity.kt app/src/main/java/com/stokakun/app/data/AccountEntity.kt
+          mv AppDatabase.kt app/src/main/java/com/stokakun/app/data/AppDatabase.kt
+          mv Converters.kt app/src/main/java/com/stokakun/app/data/Converters.kt
+          mv ScreenshotDao.kt app/src/main/java/com/stokakun/app/data/ScreenshotDao.kt
+          mv ScreenshotEntity.kt app/src/main/java/com/stokakun/app/data/ScreenshotEntity.kt
+
+          mv AccountRepository.kt app/src/main/java/com/stokakun/app/repository/AccountRepository.kt
+
+          mv StatusBadge.kt app/src/main/java/com/stokakun/app/ui/components/StatusBadge.kt
+          mv StockCard.kt app/src/main/java/com/stokakun/app/ui/components/StockCard.kt
+
+          mv NavGraph.kt app/src/main/java/com/stokakun/app/ui/navigation/NavGraph.kt
+          mv Routes.kt app/src/main/java/com/stokakun/app/ui/navigation/Routes.kt
+
+          mv AddEditAccountScreen.kt app/src/main/java/com/stokakun/app/ui/screens/AddEditAccountScreen.kt
+          mv DetailScreen.kt app/src/main/java/com/stokakun/app/ui/screens/DetailScreen.kt
+          mv FullscreenImageScreen.kt app/src/main/java/com/stokakun/app/ui/screens/FullscreenImageScreen.kt
+          mv HomeScreen.kt app/src/main/java/com/stokakun/app/ui/screens/HomeScreen.kt
+          mv StockListScreen.kt app/src/main/java/com/stokakun/app/ui/screens/StockListScreen.kt
+
+          mv Color.kt app/src/main/java/com/stokakun/app/ui/theme/Color.kt
+          mv Theme.kt app/src/main/java/com/stokakun/app/ui/theme/Theme.kt
+          mv Type.kt app/src/main/java/com/stokakun/app/ui/theme/Type.kt
+
+          mv BackupManager.kt app/src/main/java/com/stokakun/app/util/BackupManager.kt
+          mv CryptoManager.kt app/src/main/java/com/stokakun/app/util/CryptoManager.kt
+          mv ImageStorageManager.kt app/src/main/java/com/stokakun/app/util/ImageStorageManager.kt
+
+          mv AccountViewModel.kt app/src/main/java/com/stokakun/app/viewmodel/AccountViewModel.kt
+          mv MainActivity.kt app/src/main/java/com/stokakun/app/MainActivity.kt
+          mv StokAkunApp.kt app/src/main/java/com/stokakun/app/StokAkunApp.kt
+
+          mv AndroidManifest.xml app/src/main/AndroidManifest.xml
+          mv strings.xml app/src/main/res/values/strings.xml
+          mv themes.xml app/src/main/res/values/themes.xml
+          mv ic_launcher.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+
+          mv 'build.gradle.kts' app/build.gradle.kts
+          mv 'build.gradle (1).kts' build.gradle.kts
+          mv proguard-rules.pro app/proguard-rules.pro
+          mv gradle-wrapper.properties gradle/wrapper/gradle-wrapper.properties
+
+          git status --short
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: restore Android project structure'
+          git push
