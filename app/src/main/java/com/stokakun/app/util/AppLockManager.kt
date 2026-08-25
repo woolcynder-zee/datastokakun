@@ -1,7 +1,6 @@
 package com.stokakun.app.util
 
 import android.content.Context
-import android.os.SystemClock
 import android.util.Base64
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -14,8 +13,9 @@ class AppLockManager(context: Context) {
     val remainingLockoutSeconds: Int
         get() {
             val until = prefs.getLong(KEY_LOCKOUT_UNTIL, 0L)
-            return (((until - SystemClock.elapsedRealtime()).coerceAtLeast(0L)) / 1000L).toInt().let { seconds ->
-                if (until > SystemClock.elapsedRealtime() && seconds == 0) 1 else seconds
+            val remaining = (until - System.currentTimeMillis()).coerceAtLeast(0L)
+            return (remaining / 1000L).toInt().let { seconds ->
+                if (remaining > 0L && seconds == 0) 1 else seconds
             }
         }
 
@@ -62,7 +62,7 @@ class AppLockManager(context: Context) {
         if (attempts >= MAX_FAILED_ATTEMPTS) {
             prefs.edit()
                 .putInt(KEY_FAILED_ATTEMPTS, 0)
-                .putLong(KEY_LOCKOUT_UNTIL, SystemClock.elapsedRealtime() + LOCKOUT_MS)
+                .putLong(KEY_LOCKOUT_UNTIL, System.currentTimeMillis() + LOCKOUT_MS)
                 .apply()
         } else {
             prefs.edit().putInt(KEY_FAILED_ATTEMPTS, attempts).apply()
