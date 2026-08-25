@@ -32,6 +32,9 @@ interface ScreenshotDao {
     @Query("DELETE FROM screenshots WHERE accountId = :accountId")
     suspend fun deleteAllForAccount(accountId: Long)
 
+    @Query("DELETE FROM screenshots WHERE accountId IN (:accountIds)")
+    suspend fun deleteAllForAccounts(accountIds: List<Long>)
+
     @Query("SELECT * FROM screenshots")
     suspend fun getAllOnce(): List<ScreenshotEntity>
 }
