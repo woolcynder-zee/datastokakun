@@ -42,6 +42,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -107,17 +108,19 @@ fun AddEditAccountScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    if (isEdit && !initialized && existingAccount != null) {
-        val acc = existingAccount
-        game = acc.game
-        name = acc.name
-        price = acc.price.toString()
-        status = acc.status
-        username = acc.username
-        password = viewModel.decryptPassword(acc.passwordEncrypted)
-        initialPassword = password
-        notes = acc.notes
-        initialized = true
+    LaunchedEffect(existingAccount?.id) {
+        if (isEdit && existingAccount != null && !initialized) {
+            val acc = existingAccount
+            game = acc.game
+            name = acc.name
+            price = acc.price.toString()
+            status = acc.status
+            username = acc.username
+            password = viewModel.decryptPassword(acc.passwordEncrypted)
+            initialPassword = password
+            notes = acc.notes
+            initialized = true
+        }
     }
 
     val pickImagesLauncher = rememberLauncherForActivityResult(
