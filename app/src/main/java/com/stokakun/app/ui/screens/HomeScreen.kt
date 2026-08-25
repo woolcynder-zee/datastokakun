@@ -87,7 +87,11 @@ fun HomeScreen(
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
-        if (uri != null) scope.launch {
+        if (uri == null) {
+            pendingExportPassword = ""
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
             val password = pendingExportPassword
             runCatching {
                 val db = AppDatabase.getInstance(context)
@@ -104,7 +108,11 @@ fun HomeScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null) scope.launch {
+        if (uri == null) {
+            importPassword = ""
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
             val password = importPassword.ifBlank { null }
             runCatching {
                 val db = AppDatabase.getInstance(context)
@@ -210,16 +218,16 @@ fun HomeScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    if (exportPassword.length < 8) {
-                        scope.launch { snackbarHostState.showSnackbar("Password backup minimal 8 karakter.") }
-                    } else if (exportPassword != exportPasswordConfirm) {
-                        scope.launch { snackbarHostState.showSnackbar("Konfirmasi password tidak cocok.") }
-                    } else {
-                        pendingExportPassword = exportPassword
-                        exportPassword = ""
-                        exportPasswordConfirm = ""
-                        showExportPassword = false
-                        exportLauncher.launch("stok-akun-portable-backup.zip")
+                    when {
+                        exportPassword.length < 8 -> scope.launch { snackbarHostState.showSnackbar("Password backup minimal 8 karakter.") }
+                        exportPassword != exportPasswordConfirm -> scope.launch { snackbarHostState.showSnackbar("Konfirmasi password tidak cocok.") }
+                        else -> {
+                            pendingExportPassword = exportPassword
+                            exportPassword = ""
+                            exportPasswordConfirm = ""
+                            showExportPassword = false
+                            exportLauncher.launch("stok-akun-portable-backup.zip")
+                        }
                     }
                 }) { Text("Export") }
             },
