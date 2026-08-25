@@ -7,6 +7,7 @@ import com.stokakun.app.data.AccountDao
 import com.stokakun.app.data.AccountEntity
 import com.stokakun.app.data.AccountStatus
 import com.stokakun.app.data.AppDatabase
+import com.stokakun.app.data.GameStat
 import com.stokakun.app.data.ScreenshotDao
 import com.stokakun.app.data.ScreenshotEntity
 import com.stokakun.app.util.CryptoManager
@@ -26,6 +27,7 @@ class AccountRepository(
     fun getCountByStatus(status: AccountStatus): Flow<Int> = accountDao.getCountByStatus(status.name)
     fun getActiveStockValue(): Flow<Long> = accountDao.getActiveStockValue()
     fun getSoldStockValue(): Flow<Long> = accountDao.getSoldStockValue()
+    fun getGameStats(): Flow<List<GameStat>> = accountDao.getGameStats()
     fun getScreenshots(accountId: Long): Flow<List<ScreenshotEntity>> = screenshotDao.getForAccount(accountId)
     fun getScreenshotCount(accountId: Long): Flow<Int> = screenshotDao.getCountForAccount(accountId)
     fun decryptPassword(encrypted: String): String = CryptoManager.decrypt(encrypted)
