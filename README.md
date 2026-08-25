@@ -1,4 +1,4 @@
-# Stok Akun
+# Stok Akun v2
 
 Aplikasi Android lokal untuk mencatat stok akun game dan banyak screenshot fullspek.
 
@@ -12,13 +12,25 @@ Aplikasi Android lokal untuk mencatat stok akun game dan banyak screenshot fulls
 
 > **Penting:** ciphertext password terikat pada Android Keystore di instalasi/perangkat. Backup dapat memulihkan data dan gambar, tetapi password terenkripsi dari instalasi lama tidak dapat didekripsi setelah aplikasi di-uninstall/reinstall atau dipindahkan ke perangkat lain.
 
-## Fitur
-- Dashboard stok.
-- Search dan filter Available / Reserved / Sold.
+## Fitur v2
+- Dashboard dengan jumlah Total / Available / Reserved / Sold dan nilai stok aktif.
+- Search berdasarkan game, nama/ID stok, dan username.
+- Filter Available / Reserved / Sold.
+- Sorting terbaru, terlama, nama A–Z/Z–A, harga tertinggi/terendah.
 - Tambah, edit, hapus akun.
+- Pencegahan duplikasi akun pada data identitas yang sama.
 - Banyak screenshot fullspek per akun.
 - Gallery + fullscreen image viewer.
-- Export/import backup ZIP tanpa Base64 untuk gambar.
+- Batas screenshot 25 MB per file.
+- Storage Manager untuk melihat ukuran penyimpanan dan membersihkan orphan file.
+- Bulk select untuk ubah status atau hapus banyak akun sekaligus.
+- Copy username/password dari detail akun.
+- Clipboard credential dibersihkan otomatis setelah 30 detik bila isinya masih credential yang disalin aplikasi.
+- Share detail akun.
+- App Lock PIN 4–8 digit dengan PBKDF2 + salt.
+- Lockout setelah terlalu banyak percobaan PIN.
+- App tidak mengunci ulang hanya karena membuka file picker/share sheet; penguncian background memakai grace period 30 detik.
+- Export/import backup ZIP dengan validasi archive, perlindungan path traversal, batas ukuran, deduplikasi, dan rollback database.
 
 ## Struktur project
 Project Android yang dipakai build berada di modul `app/`:
@@ -27,7 +39,7 @@ Project Android yang dipakai build berada di modul `app/`:
 - `app/src/main/java/com/stokakun/app/repository` — akses data dan penyimpanan screenshot.
 - `app/src/main/java/com/stokakun/app/viewmodel` — state dan aksi UI.
 - `app/src/main/java/com/stokakun/app/ui` — screen, navigation, component, theme.
-- `app/src/main/java/com/stokakun/app/util` — backup, enkripsi, dan file gambar.
+- `app/src/main/java/com/stokakun/app/util` — backup, enkripsi, app lock, dan file gambar.
 
 ## Membuka di Android Studio
 1. Clone/download repository ini.
