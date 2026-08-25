@@ -37,8 +37,10 @@ object BackupManager {
         val screenshots = screenshotDao.getAllOnce()
         val accountsJson = JSONArray()
         accounts.forEach { acc ->
-            val plainPassword = runCatching { CryptoManager.decrypt(acc.passwordEncrypted) }
-                .getOrElse { throw IllegalArgumentException("Tidak bisa membaca password akun ${acc.name}. Pastikan data masih berada di instalasi asli.") }
+            val plainPassword = CryptoManager.decryptOrNull(acc.passwordEncrypted)
+                ?: throw IllegalArgumentException(
+                    "Tidak bisa membaca password akun ${acc.name}. Data mungkin berasal dari instalasi lama atau Keystore tidak tersedia."
+                )
             accountsJson.put(JSONObject().apply {
                 put("id", acc.id)
                 put("game", acc.game)
@@ -169,16 +171,18 @@ object BackupManager {
                     } else {
                         a.getString("passwordEncrypted")
                     }
-                    val newId = accountDao.insert(AccountEntity(
-                        game = game,
-                        name = name,
-                        price = a.getLong("price").coerceAtLeast(0L),
-                        status = AccountStatus.valueOf(a.getString("status")),
-                        username = username,
-                        passwordEncrypted = passwordEncrypted,
-                        notes = a.getString("notes"),
-                        createdAt = a.getLong("createdAt")
-                    ))
+                    val newId = accountDao.insert(
+                        AccountEntity(
+                            game = game,
+                            name = name,
+                            price = a.getLong("price").coerceAtLeast(0L),
+                            status = AccountStatus.valueOf(a.getString("status")),
+                            username = username,
+                            passwordEncrypted = passwordEncrypted,
+                            notes = a.getString("notes"),
+                            createdAt = a.getLong("createdAt")
+                        )
+                    )
                     idMap[oldId] = newId
                     newlyInsertedOldIds += oldId
                 }
@@ -193,12 +197,14 @@ object BackupManager {
                     val newPath = ImageStorageManager.copyLocalFileToStorage(context, sourceFile)
                         ?: throw IllegalArgumentException("Gagal memulihkan screenshot.")
                     copiedFiles += newPath
-                    screenshotDao.insert(ScreenshotEntity(
-                        accountId = newAccountId,
-                        filePath = newPath,
-                        createdAt = s.getLong("createdAt"),
-                        sortOrder = s.getInt("sortOrder")
-                    ))
+                    screenshotDao.insert(
+                        ScreenshotEntity(
+                            accountId = newAccountId,
+                            filePath = newPath,
+                            createdAt = s.getLong("createdAt"),
+                            sortOrder = s.getInt("sortOrder")
+                        )
+                    )
                 }
             }
             return true
