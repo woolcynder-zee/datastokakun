@@ -114,7 +114,12 @@ fun AddEditAccountScreen(
         price = acc.price.toString()
         status = acc.status
         username = acc.username
-        password = viewModel.decryptPassword(acc.passwordEncrypted)
+        try {
+            password = viewModel.decryptPassword(acc.passwordEncrypted)
+        } catch (e: Exception) {
+            password = ""
+            scope.launch { snackbarHostState.showSnackbar("Peringatan: Gagal mendekripsi password: ${e.message}") }
+        }
         initialPassword = password
         notes = acc.notes
         initialized = true
