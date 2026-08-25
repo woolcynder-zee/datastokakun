@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,7 +53,8 @@ fun HomeScreen(
     viewModel: AccountViewModel,
     onAddClick: () -> Unit,
     onAccountClick: (Long) -> Unit,
-    onSeeAllClick: () -> Unit
+    onSeeAllClick: () -> Unit,
+    onStorageClick: () -> Unit
 ) {
     val total by viewModel.totalCount.collectAsState()
     val available by viewModel.availableCount.collectAsState()
@@ -89,6 +91,9 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(title = { Text("Stok Akun") }, actions = {
+                IconButton(onClick = onStorageClick) {
+                    Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan")
+                }
                 IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) {
                     Icon(Icons.Filled.FileUpload, contentDescription = "Export backup")
                 }
@@ -106,9 +111,7 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                SummaryCard("Nilai Stok Aktif", formatPrice(activeValue), Modifier.fillMaxWidth())
-            }
+            item { SummaryCard("Nilai Stok Aktif", formatPrice(activeValue), Modifier.fillMaxWidth()) }
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SummaryCard("Total Stok", total.toString(), Modifier.weight(1f))
