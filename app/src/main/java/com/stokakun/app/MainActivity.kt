@@ -25,25 +25,20 @@ import com.stokakun.app.viewmodel.AccountViewModel
 
 class MainActivity : ComponentActivity() {
     private var backgroundAt: Long? = null
+    private var lockStateSetter: ((Boolean) -> Unit)? = null
 
     override fun onStart() {
         super.onStart()
         val startedAt = backgroundAt
         if (startedAt != null && SystemClock.elapsedRealtime() - startedAt >= LOCK_AFTER_BACKGROUND_MS) {
             backgroundAt = null
-            setLockState(true)
+            lockStateSetter?.invoke(true)
         }
     }
 
     override fun onStop() {
         super.onStop()
         if (!isChangingConfigurations) backgroundAt = SystemClock.elapsedRealtime()
-    }
-
-    private var lockStateSetter: ((Boolean) -> Unit)? = null
-
-    private fun setLockState(locked: Boolean) {
-        lockStateSetter?.invoke(locked)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,19 +51,14 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     var unlocked by remember { mutableStateOf(!lockManager.isEnabled) }
                     lockStateSetter = { locked ->
-                        if (!lockManager.isEnabled) {
-                            unlocked = true
-                        } else if (locked) {
-                            unlocked = false
-                        }
+                        if (!lockManager.isEnabled) unlocked = true
+                        else if (locked) unlocked = false
                     }
                     val lifecycleOwner = LocalLifecycleOwner.current
 
-                    DisposableEffect(lifecycleOwner, lockManager.isEnabled) {
+                    DisposableEffect(lifecycleOwner) {
                         val observer = LifecycleEventObserver { _, event ->
-                            if (event == Lifecycle.Event.ON_DESTROY) {
-                                lockStateSetter = null
-                            }
+                            if (event == Lifecycle.Event.ON_DESTROY) lockStateSetter = null
                         }
                         lifecycleOwner.lifecycle.addObserver(observer)
                         onDispose {
@@ -81,14 +71,17 @@ class MainActivity : ComponentActivity() {
                         val viewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory(app.repository))
                         StokAkunNavGraph(viewModel = viewModel)
                     } else {
-                        LockScreen { pin ->
-                            val verified = lockManager.verifyPin(pin)
-                            if (verified) {
-                                backgroundAt = null
-                                unlocked = true
-                            }
-                            verified
-                        }
+                        LockScreen(
+                            onUnlock = { pin ->
+                                val verified = lockManager.verifyPin(pin)
+                                if (verified) {
+                                    backgroundAt = null
+                                    unlocked = true
+                                }
+                                verified
+                            },
+                            remainingLockoutSeconds = { lockManager.remainingLockoutSeconds }
+                        )
                     }
                 }
             }
