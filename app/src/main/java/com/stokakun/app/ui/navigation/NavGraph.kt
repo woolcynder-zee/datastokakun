@@ -19,78 +19,43 @@ import com.stokakun.app.viewmodel.AccountViewModel
 @Composable
 fun StokAkunNavGraph(viewModel: AccountViewModel) {
     val navController: NavHostController = rememberNavController()
-
     NavHost(navController = navController, startDestination = Routes.HOME) {
-
         composable(Routes.HOME) {
-            HomeScreen(
-                viewModel = viewModel,
-                onAddClick = { navController.navigate(Routes.ADD) },
-                onAccountClick = { id -> navController.navigate(Routes.detail(id)) },
-                onSeeAllClick = { navController.navigate(Routes.LIST) }
-            )
+            HomeScreen(viewModel, { navController.navigate(Routes.ADD) }, { id -> navController.navigate(Routes.detail(id)) }, { navController.navigate(Routes.LIST) })
         }
-
         composable(Routes.LIST) {
-            StockListScreen(
-                viewModel = viewModel,
-                onAccountClick = { id -> navController.navigate(Routes.detail(id)) },
-                onBack = { navController.popBackStack() }
-            )
+            StockListScreen(viewModel, { id -> navController.navigate(Routes.detail(id)) }, { navController.popBackStack() })
         }
-
         composable(Routes.ADD) {
-            AddEditAccountScreen(
-                viewModel = viewModel,
-                accountId = null,
-                onSaved = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
-            )
+            AddEditAccountScreen(viewModel, null, { navController.popBackStack() }, { navController.popBackStack() })
         }
-
-        composable(
-            route = Routes.EDIT,
-            arguments = listOf(navArgument("accountId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val accountId = backStackEntry.arguments?.getLong("accountId") ?: return@composable
-            AddEditAccountScreen(
-                viewModel = viewModel,
-                accountId = accountId,
-                onSaved = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
-            )
+        composable(Routes.EDIT, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
+            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
+            AddEditAccountScreen(viewModel, accountId, { navController.popBackStack() }, { navController.popBackStack() })
         }
-
-        composable(
-            route = Routes.DETAIL,
-            arguments = listOf(navArgument("accountId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val accountId = backStackEntry.arguments?.getLong("accountId") ?: return@composable
+        composable(Routes.DETAIL, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
+            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
             DetailScreen(
                 viewModel = viewModel,
                 accountId = accountId,
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Routes.edit(id)) },
-                onDeleted = {
-                    navController.popBackStack(Routes.HOME, inclusive = false)
-                },
+                onDeleted = { navController.popBackStack() },
                 onImageClick = { id, index -> navController.navigate(Routes.fullscreen(id, index)) }
             )
         }
-
         composable(
-            route = Routes.FULLSCREEN,
+            Routes.FULLSCREEN,
             arguments = listOf(
                 navArgument("accountId") { type = NavType.LongType },
                 navArgument("index") { type = NavType.IntType }
             )
-        ) { backStackEntry ->
-            val accountId = backStackEntry.arguments?.getLong("accountId") ?: return@composable
-            val index = backStackEntry.arguments?.getInt("index") ?: 0
+        ) { entry ->
+            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
             FullscreenImageScreen(
                 viewModel = viewModel,
                 accountId = accountId,
-                initialIndex = index,
+                initialIndex = entry.arguments?.getInt("index") ?: 0,
                 onBack = { navController.popBackStack() }
             )
         }
