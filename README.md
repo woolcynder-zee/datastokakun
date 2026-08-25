@@ -6,14 +6,14 @@ Aplikasi Android lokal untuk mencatat stok akun game dan banyak screenshot fulls
 - Metadata akun disimpan di Room (database lokal).
 - Screenshot disimpan sebagai file asli di `filesDir/screenshots`.
 - Tidak menggunakan Supabase, Firebase, cloud, atau Base64 untuk gambar.
-- Password akun dienkripsi dengan Android Keystore AES-GCM.
+- Password akun saat digunakan di aplikasi dienkripsi dengan Android Keystore AES-GCM.
 - Aplikasi tidak meminta izin internet.
-- Backup ZIP berisi metadata JSON + file gambar asli; password tetap berupa ciphertext Keystore.
-
-> **Penting:** ciphertext password terikat pada Android Keystore di instalasi/perangkat. Backup dapat memulihkan data dan gambar, tetapi password terenkripsi dari instalasi lama tidak dapat didekripsi setelah aplikasi di-uninstall/reinstall atau dipindahkan ke perangkat lain.
+- Backup portable v2 menyimpan password akun di dalam metadata yang dienkripsi dengan password backup berbasis PBKDF2 + AES-GCM sehingga dapat dipulihkan lintas perangkat.
+- Backup lama v1 tetap dapat diimpor untuk data/gambar; ciphertext password v1 tetap terikat ke Android Keystore instalasi asal.
 
 ## Fitur v2
-- Dashboard dengan jumlah Total / Available / Reserved / Sold dan nilai stok aktif.
+- Dashboard dengan jumlah Total / Available / Reserved / Sold dan nilai stok aktif/terjual.
+- Ringkasan stok per game: jumlah, status, dan nilai aktif.
 - Search berdasarkan game, nama/ID stok, dan username.
 - Filter Available / Reserved / Sold.
 - Sorting terbaru, terlama, nama A–Z/Z–A, harga tertinggi/terendah.
@@ -30,6 +30,8 @@ Aplikasi Android lokal untuk mencatat stok akun game dan banyak screenshot fulls
 - App Lock PIN 4–8 digit dengan PBKDF2 + salt.
 - Lockout setelah terlalu banyak percobaan PIN.
 - App tidak mengunci ulang hanya karena membuka file picker/share sheet; penguncian background memakai grace period 30 detik.
+- Backup/export portable meminta password minimal 8 karakter dan memakai enkripsi password-based.
+- Import mendukung backup portable v2 dan backup lama v1.
 - Export/import backup ZIP dengan validasi archive, perlindungan path traversal, batas ukuran, deduplikasi, dan rollback database.
 
 ## Struktur project
