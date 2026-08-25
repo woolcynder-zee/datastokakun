@@ -45,8 +45,8 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     private fun sortAccounts(accounts: List<AccountEntity>, sort: SortOption): List<AccountEntity> = when (sort) {
         SortOption.NEWEST -> accounts.sortedByDescending { it.createdAt }
         SortOption.OLDEST -> accounts.sortedBy { it.createdAt }
-        SortOption.NAME_AZ -> accounts.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-        SortOption.NAME_ZA -> accounts.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.name })
+        SortOption.NAME_AZ -> accounts.sortedBy { it.name.lowercase() }
+        SortOption.NAME_ZA -> accounts.sortedByDescending { it.name.lowercase() }
         SortOption.PRICE_HIGH -> accounts.sortedByDescending { it.price }
         SortOption.PRICE_LOW -> accounts.sortedBy { it.price }
     }
