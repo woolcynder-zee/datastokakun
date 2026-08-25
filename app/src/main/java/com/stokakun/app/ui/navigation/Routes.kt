@@ -5,6 +5,7 @@ object Routes {
     const val LIST = "list"
     const val ADD = "add"
     const val STORAGE = "storage"
+    const val SETTINGS = "settings"
     const val EDIT = "edit/{accountId}"
     const val DETAIL = "detail/{accountId}"
     const val FULLSCREEN = "fullscreen/{accountId}/{index}"
