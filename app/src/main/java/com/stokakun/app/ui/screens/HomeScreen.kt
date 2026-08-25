@@ -50,14 +50,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    viewModel: AccountViewModel,
-    onAddClick: () -> Unit,
-    onAccountClick: (Long) -> Unit,
-    onSeeAllClick: () -> Unit,
-    onStorageClick: () -> Unit,
-    onSettingsClick: () -> Unit
-) {
+fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountClick: (Long) -> Unit, onSeeAllClick: () -> Unit, onStorageClick: () -> Unit, onSettingsClick: () -> Unit) {
     val total by viewModel.totalCount.collectAsState()
     val available by viewModel.availableCount.collectAsState()
     val reserved by viewModel.reservedCount.collectAsState()
@@ -70,47 +63,40 @@ fun HomeScreen(
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) scope.launch {
-            runCatching {
-                val db = AppDatabase.getInstance(context)
-                BackupManager.export(context, uri, db.accountDao(), db.screenshotDao())
-            }.onSuccess { snackbarHostState.showSnackbar("Backup berhasil diekspor.") }
+            runCatching { val db = AppDatabase.getInstance(context); BackupManager.export(context, uri, db.accountDao(), db.screenshotDao()) }
+                .onSuccess { snackbarHostState.showSnackbar("Backup berhasil diekspor.") }
                 .onFailure { snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}") }
         }
     }
-
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
-            runCatching {
-                val db = AppDatabase.getInstance(context)
-                BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao())
-            }.onSuccess { success ->
-                snackbarHostState.showSnackbar(if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup.")
-            }.onFailure { snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}") }
+            runCatching { val db = AppDatabase.getInstance(context); BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao()) }
+                .onSuccess { success -> snackbarHostState.showSnackbar(if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup.") }
+                .onFailure { snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}") }
         }
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(title = { Text("Stok Akun") }, actions = {
-                IconButton(onClick = onSettingsClick) { Icon(Icons.Filled.Settings, contentDescription = "Pengaturan") }
-                IconButton(onClick = onStorageClick) { Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan") }
-                IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) { Icon(Icons.Filled.FileUpload, contentDescription = "Export backup") }
-                IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) { Icon(Icons.Filled.FileDownload, contentDescription = "Import backup") }
-            })
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onAddClick, icon = { Icon(Icons.Filled.Add, contentDescription = null) }, text = { Text("Tambah Akun") })
-        }
+        topBar = { TopAppBar(title = { Text("Stok Akun") }, actions = {
+            IconButton(onClick = onSettingsClick) { Icon(Icons.Filled.Settings, contentDescription = "Pengaturan") }
+            IconButton(onClick = onStorageClick) { Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan") }
+            IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) { Icon(Icons.Filled.FileUpload, contentDescription = "Export backup") }
+            IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) { Icon(Icons.Filled.FileDownload, contentDescription = "Import backup") }
+        }) },
+        floatingActionButton = { ExtendedFloatingActionButton(onClick = onAddClick, icon = { Icon(Icons.Filled.Add, contentDescription = null) }, text = { Text("Tambah Akun") }) }
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { SummaryCard("Nilai Stok Aktif", formatPrice(activeValue), Modifier.fillMaxWidth()) }
-            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard("Total Stok", total.toString(), Modifier.weight(1f)); SummaryCard("Available", available.toString(), Modifier.weight(1f)) } }
-            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard("Reserved", reserved.toString(), Modifier.weight(1f)); SummaryCard("Sold", sold.toString(), Modifier.weight(1f)) } }
+            item { SummaryCard(label = "Nilai Stok Aktif", value = formatPrice(activeValue), modifier = Modifier.fillMaxWidth()) }
+            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Total Stok", value = total.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Available", value = available.toString(), modifier = Modifier.weight(1f)) } }
+            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Reserved", value = reserved.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Sold", value = sold.toString(), modifier = Modifier.weight(1f)) } }
             item { Spacer(modifier = Modifier.height(4.dp)); Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium) }
             if (recent.isEmpty()) item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(recent, key = { it.id }) { account -> val shotCount by viewModel.screenshotCount(account.id).collectAsState(); StockCard(account, shotCount) { onAccountClick(account.id) } }
-            item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
+            items(recent, key = { it.id }) { account ->
+                val shotCount by viewModel.screenshotCount(account.id).collectAsState()
+                StockCard(account = account, screenshotCount = shotCount, onClick = { onAccountClick(account.id) })
+            }
+            item { TextButton(onClick = { onSeeAllClick() }) { Text("Lihat semua stok") } }
         }
     }
 }
