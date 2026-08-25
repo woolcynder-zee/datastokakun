@@ -51,35 +51,27 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         SortOption.PRICE_LOW -> accounts.sortedBy { it.price }
     }
 
-    fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    fun accountFlow(id: Long): StateFlow<AccountEntity?> = repository.getAccountById(id)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = repository.getScreenshots(accountId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+    fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    fun accountFlow(id: Long): StateFlow<AccountEntity?> = repository.getAccountById(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = repository.getScreenshots(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     fun decryptPassword(encrypted: String): String = repository.decryptPassword(encrypted)
 
-    fun saveAccount(
-        existingId: Long?, originalCreatedAt: Long?, game: String, name: String, price: Long,
-        status: AccountStatus, username: String, plainPassword: String,
-        passwordEncryptedOverride: String?, notes: String, newImageUris: List<Uri>,
-        removedScreenshotIds: List<Long>, onDone: (Long) -> Unit, onError: (Throwable) -> Unit = {}
-    ) {
+    fun saveAccount(existingId: Long?, originalCreatedAt: Long?, game: String, name: String, price: Long, status: AccountStatus, username: String, plainPassword: String, passwordEncryptedOverride: String?, notes: String, newImageUris: List<Uri>, removedScreenshotIds: List<Long>, onDone: (Long) -> Unit, onError: (Throwable) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching {
-                repository.saveAccount(existingId, originalCreatedAt, game, name, price, status, username,
-                    plainPassword, passwordEncryptedOverride, notes, newImageUris, removedScreenshotIds)
-            }.onSuccess(onDone).onFailure(onError)
+            runCatching { repository.saveAccount(existingId, originalCreatedAt, game, name, price, status, username, plainPassword, passwordEncryptedOverride, notes, newImageUris, removedScreenshotIds) }.onSuccess(onDone).onFailure(onError)
         }
     }
 
     fun deleteAccount(account: AccountEntity, onDone: () -> Unit, onError: (Throwable) -> Unit = {}) {
-        viewModelScope.launch {
-            runCatching { repository.deleteAccount(account) }.onSuccess { onDone() }.onFailure(onError)
-        }
+        viewModelScope.launch { runCatching { repository.deleteAccount(account) }.onSuccess { onDone() }.onFailure(onError) }
+    }
+
+    fun bulkUpdateStatus(ids: Set<Long>, status: AccountStatus, onDone: (Int) -> Unit, onError: (Throwable) -> Unit = {}) {
+        viewModelScope.launch { runCatching { repository.bulkUpdateStatus(ids.toList(), status) }.onSuccess(onDone).onFailure(onError) }
+    }
+
+    fun bulkDelete(ids: Set<Long>, onDone: (Int) -> Unit, onError: (Throwable) -> Unit = {}) {
+        viewModelScope.launch { runCatching { repository.bulkDelete(ids.toList()) }.onSuccess(onDone).onFailure(onError) }
     }
 
     class Factory(private val repository: AccountRepository) : ViewModelProvider.Factory {
@@ -89,10 +81,5 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
 }
 
 enum class SortOption(val label: String) {
-    NEWEST("Terbaru"),
-    OLDEST("Terlama"),
-    NAME_AZ("Nama A–Z"),
-    NAME_ZA("Nama Z–A"),
-    PRICE_HIGH("Harga tertinggi"),
-    PRICE_LOW("Harga terendah")
+    NEWEST("Terbaru"), OLDEST("Terlama"), NAME_AZ("Nama A–Z"), NAME_ZA("Nama Z–A"), PRICE_HIGH("Harga tertinggi"), PRICE_LOW("Harga terendah")
 }
