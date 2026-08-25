@@ -82,7 +82,11 @@ fun DetailScreen(
         scope.launch {
             snackbarHostState.showSnackbar("$label disalin. Clipboard akan dibersihkan otomatis.")
             delay(30_000)
-            runCatching { clipboard.clearPrimaryClip() }
+            runCatching {
+                val current = clipboard.primaryClip
+                val currentText = current?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                if (currentText == value) clipboard.clearPrimaryClip()
+            }
         }
     }
 
