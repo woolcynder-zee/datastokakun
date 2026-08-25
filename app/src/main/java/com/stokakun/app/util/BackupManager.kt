@@ -113,11 +113,13 @@ object BackupManager {
                             val name = entry.name
                             require(name == METADATA_FILE || isSafeScreenshotEntry(name)) { "Backup memiliki path/file yang tidak valid." }
                             if (name == METADATA_FILE) {
+                                require(metadataText == null) { "Backup memiliki metadata duplikat." }
                                 val bytes = zip.readBytes()
                                 totalBytes += bytes.size
                                 require(totalBytes <= MAX_UNCOMPRESSED_BYTES) { "Backup terlalu besar." }
                                 metadataText = bytes.toString(Charsets.UTF_8)
                             } else {
+                                require(!extractedFiles.containsKey(name)) { "Backup memiliki screenshot duplikat." }
                                 val safeName = File(name).name
                                 require(safeName == name.substringAfterLast('/')) { "Nama file screenshot tidak valid." }
                                 val outFile = File(tempDir, safeName)
@@ -150,12 +152,14 @@ object BackupManager {
             val accountsJson = json.getJSONArray("accounts")
             val screenshotsJson = json.getJSONArray("screenshots")
             require(accountsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak akun." }
+            require(screenshotsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak screenshot." }
 
             val idMap = mutableMapOf<Long, Long>()
             val accountData = mutableListOf<Pair<Long, AccountEntity?>>()
             for (i in 0 until accountsJson.length()) {
                 val a = accountsJson.getJSONObject(i)
                 val oldId = a.getLong("id")
+                require(idMap[oldId] == null) { "Backup memiliki ID akun duplikat." }
                 val game = a.getString("game").trim()
                 val name = a.getString("name").trim()
                 val username = a.getString("username").trim()
@@ -200,11 +204,13 @@ object BackupManager {
             for (i in 0 until screenshotsJson.length()) {
                 val s = screenshotsJson.getJSONObject(i)
                 val oldAccountId = s.getLong("accountId")
-                val newAccountId = idMap[oldAccountId] ?: continue
+                val newAccountId = idMap[oldAccountId]
+                    ?: throw IllegalArgumentException("Screenshot merujuk akun yang tidak ada: $oldAccountId")
                 val zipEntry = s.getString("zipEntry")
-                val sourceFile = extractedFiles[zipEntry] ?: continue
+                val sourceFile = extractedFiles[zipEntry]
+                    ?: throw IllegalArgumentException("Screenshot backup tidak ditemukan: $zipEntry")
                 val newPath = ImageStorageManager.copyLocalFileToStorage(context, sourceFile)
-                    ?: throw IllegalArgumentException("Gagal memulihkan screenshot.")
+                    ?: throw IllegalArgumentException("Gagal memulihkan screenshot: $zipEntry")
                 copiedFiles += newPath
                 stagedScreenshots += ScreenshotEntity(
                     accountId = newAccountId,
