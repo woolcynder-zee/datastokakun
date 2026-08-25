@@ -2,6 +2,7 @@ package com.stokakun.app
 
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,22 +28,10 @@ class MainActivity : ComponentActivity() {
     private var backgroundAt: Long? = null
     private var lockStateSetter: ((Boolean) -> Unit)? = null
 
-    override fun onStart() {
-        super.onStart()
-        val startedAt = backgroundAt
-        if (startedAt != null && SystemClock.elapsedRealtime() - startedAt >= LOCK_AFTER_BACKGROUND_MS) {
-            backgroundAt = null
-            lockStateSetter?.invoke(true)
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        if (!isChangingConfigurations) backgroundAt = SystemClock.elapsedRealtime()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+
         val app = application as StokAkunApp
         val lockManager = AppLockManager(this)
 
@@ -86,6 +75,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val startedAt = backgroundAt
+        if (startedAt != null && SystemClock.elapsedRealtime() - startedAt >= LOCK_AFTER_BACKGROUND_MS) {
+            backgroundAt = null
+            lockStateSetter?.invoke(true)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) backgroundAt = SystemClock.elapsedRealtime()
     }
 
     companion object {
