@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,31 +31,24 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FullscreenImageScreen(
-    viewModel: AccountViewModel,
-    accountId: Long,
-    initialIndex: Int,
-    onBack: () -> Unit
-) {
+fun FullscreenImageScreen(viewModel: AccountViewModel, accountId: Long, initialIndex: Int, onBack: () -> Unit) {
     val screenshots by viewModel.screenshotsFlow(accountId).collectAsState()
+    val safeInitialIndex = remember(screenshots, initialIndex) {
+        if (screenshots.isEmpty()) 0 else initialIndex.coerceIn(0, screenshots.size - 1)
+    }
+
     if (screenshots.isEmpty()) {
-        onBack()
+        LaunchedEffect(accountId) { onBack() }
         return
     }
 
-    val safeInitialIndex = initialIndex.coerceIn(0, screenshots.size - 1)
     val pagerState = rememberPagerState(initialPage = safeInitialIndex) { screenshots.size }
-
     Scaffold(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
                 title = { Text("${pagerState.currentPage + 1} / ${screenshots.size}") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Black,
                     titleContentColor = Color.White,
@@ -65,10 +60,7 @@ fun FullscreenImageScreen(
         HorizontalPager(
             state = pagerState,
             contentPadding = PaddingValues(),
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .padding(paddingValues)
+            modifier = Modifier.fillMaxSize().background(Color.Black).padding(paddingValues)
         ) { page ->
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(

@@ -2,7 +2,7 @@ name: Build Debug APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "**" ]
   workflow_dispatch:
 
 jobs:
@@ -27,11 +27,14 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Ensure Gradle wrapper files exist
+      - name: Generate Gradle Wrapper
         run: gradle wrapper --gradle-version 8.9
 
+      - name: Make wrapper executable
+        run: chmod +x gradlew
+
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew clean assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
