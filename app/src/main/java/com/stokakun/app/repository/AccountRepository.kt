@@ -44,11 +44,15 @@ class AccountRepository(
         status: AccountStatus,
         username: String,
         plainPassword: String,
+        passwordEncryptedOverride: String?,
         notes: String,
         newImageUris: List<Uri>,
         removedScreenshotIds: List<Long>
     ): Long {
-        val encryptedPassword = CryptoManager.encrypt(plainPassword)
+        // When editing, preserve the existing ciphertext if the password field was
+        // not changed. This prevents an unavailable/invalid Keystore key from
+        // silently replacing a real password with an empty one.
+        val encryptedPassword = passwordEncryptedOverride ?: CryptoManager.encrypt(plainPassword)
 
         val accountId: Long = if (existingId == null) {
             accountDao.insert(
@@ -90,19 +94,27 @@ class AccountRepository(
             }
         }
 
-        // Add newly picked screenshots as real files.
+        // Add newly picked screenshots as real files. Continue numbering after
+        // the current maximum so deleting an earlier image cannot create ties.
         if (newImageUris.isNotEmpty()) {
-            val existingCount = screenshotDao.getForAccountOnce(accountId).size
+            val nextSortOrder = screenshotDao.getForAccountOnce(accountId)
+                .maxOfOrNull { it.sortOrder }
+                ?.plus(1)
+                ?: 0
+
             val newEntities = newImageUris.mapIndexedNotNull { index, uri ->
-                val path = ImageStorageManager.copyImageToLocalStorage(context, uri) ?: return@mapIndexedNotNull null
+                val path = ImageStorageManager.copyImageToLocalStorage(context, uri)
+                    ?: return@mapIndexedNotNull null
                 ScreenshotEntity(
                     accountId = accountId,
                     filePath = path,
                     createdAt = System.currentTimeMillis(),
-                    sortOrder = existingCount + index
+                    sortOrder = nextSortOrder + index
                 )
             }
-            screenshotDao.insertAll(newEntities)
+            if (newEntities.isNotEmpty()) {
+                screenshotDao.insertAll(newEntities)
+            }
         }
 
         return accountId
