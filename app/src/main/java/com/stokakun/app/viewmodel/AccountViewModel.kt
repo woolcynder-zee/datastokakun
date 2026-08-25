@@ -57,6 +57,7 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
 
     /** Returns null when the Android Keystore key is unavailable/corrupted instead of crashing Compose. */
     fun decryptPasswordOrNull(encrypted: String): String? = runCatching { repository.decryptPassword(encrypted) }.getOrNull()
+    fun decryptPassword(encrypted: String): String = decryptPasswordOrNull(encrypted).orEmpty()
 
     fun saveAccount(existingId: Long?, originalCreatedAt: Long?, game: String, name: String, price: Long, status: AccountStatus, username: String, plainPassword: String, passwordEncryptedOverride: String?, notes: String, newImageUris: List<Uri>, removedScreenshotIds: List<Long>, onDone: (Long) -> Unit, onError: (Throwable) -> Unit = {}) {
         viewModelScope.launch {
