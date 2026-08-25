@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,7 +55,8 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onAccountClick: (Long) -> Unit,
     onSeeAllClick: () -> Unit,
-    onStorageClick: () -> Unit
+    onStorageClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val total by viewModel.totalCount.collectAsState()
     val available by viewModel.availableCount.collectAsState()
@@ -91,50 +93,23 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(title = { Text("Stok Akun") }, actions = {
-                IconButton(onClick = onStorageClick) {
-                    Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan")
-                }
-                IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) {
-                    Icon(Icons.Filled.FileUpload, contentDescription = "Export backup")
-                }
-                IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
-                    Icon(Icons.Filled.FileDownload, contentDescription = "Import backup")
-                }
+                IconButton(onClick = onSettingsClick) { Icon(Icons.Filled.Settings, contentDescription = "Pengaturan") }
+                IconButton(onClick = onStorageClick) { Icon(Icons.Filled.Storage, contentDescription = "Penyimpanan") }
+                IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) { Icon(Icons.Filled.FileUpload, contentDescription = "Export backup") }
+                IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) { Icon(Icons.Filled.FileDownload, contentDescription = "Import backup") }
             })
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(onClick = onAddClick, icon = { Icon(Icons.Filled.Add, contentDescription = null) }, text = { Text("Tambah Akun") })
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { SummaryCard("Nilai Stok Aktif", formatPrice(activeValue), Modifier.fillMaxWidth()) }
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Total Stok", total.toString(), Modifier.weight(1f))
-                    SummaryCard("Available", available.toString(), Modifier.weight(1f))
-                }
-            }
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Reserved", reserved.toString(), Modifier.weight(1f))
-                    SummaryCard("Sold", sold.toString(), Modifier.weight(1f))
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium)
-            }
-            if (recent.isEmpty()) {
-                item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            items(recent, key = { it.id }) { account ->
-                val shotCount by viewModel.screenshotCount(account.id).collectAsState()
-                StockCard(account, shotCount) { onAccountClick(account.id) }
-            }
+            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard("Total Stok", total.toString(), Modifier.weight(1f)); SummaryCard("Available", available.toString(), Modifier.weight(1f)) } }
+            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard("Reserved", reserved.toString(), Modifier.weight(1f)); SummaryCard("Sold", sold.toString(), Modifier.weight(1f)) } }
+            item { Spacer(modifier = Modifier.height(4.dp)); Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium) }
+            if (recent.isEmpty()) item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            items(recent, key = { it.id }) { account -> val shotCount by viewModel.screenshotCount(account.id).collectAsState(); StockCard(account, shotCount) { onAccountClick(account.id) } }
             item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
         }
     }
@@ -143,9 +118,6 @@ fun HomeScreen(
 @Composable
 private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(modifier = modifier, shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Column(modifier = Modifier.padding(14.dp)) { Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary); Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
