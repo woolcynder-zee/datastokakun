@@ -44,6 +44,7 @@ import com.stokakun.app.ui.components.StockCard
 import com.stokakun.app.ui.components.formatPrice
 import com.stokakun.app.util.BackupManager
 import com.stokakun.app.viewmodel.AccountViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,23 +66,30 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        if (uri != null) scope.launch {
+        if (uri != null) scope.launch(Dispatchers.IO) {
             runCatching {
                 val db = AppDatabase.getInstance(context)
                 BackupManager.export(context, uri, db.accountDao(), db.screenshotDao())
-            }.onSuccess { snackbarHostState.showSnackbar("Backup berhasil diekspor.") }
-                .onFailure { snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}") }
+            }.onSuccess { 
+                scope.launch { snackbarHostState.showSnackbar("Backup berhasil diekspor.") }
+            }.onFailure { 
+                scope.launch { snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}") }
+            }
         }
     }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
+        if (uri != null) scope.launch(Dispatchers.IO) {
             runCatching {
                 val db = AppDatabase.getInstance(context)
                 BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao())
             }.onSuccess { success ->
-                snackbarHostState.showSnackbar(if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup.")
-            }.onFailure { snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}") }
+                scope.launch { 
+                    snackbarHostState.showSnackbar(if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup.")
+                }
+            }.onFailure { 
+                scope.launch { snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}") }
+            }
         }
     }
 
