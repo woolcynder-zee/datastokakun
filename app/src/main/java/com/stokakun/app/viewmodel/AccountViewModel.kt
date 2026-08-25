@@ -54,7 +54,9 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     fun screenshotCount(accountId: Long): StateFlow<Int> = repository.getScreenshotCount(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     fun accountFlow(id: Long): StateFlow<AccountEntity?> = repository.getAccountById(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     fun screenshotsFlow(accountId: Long): StateFlow<List<ScreenshotEntity>> = repository.getScreenshots(accountId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    fun decryptPassword(encrypted: String): String = repository.decryptPassword(encrypted)
+
+    /** Returns null when the Android Keystore key is unavailable/corrupted instead of crashing Compose. */
+    fun decryptPasswordOrNull(encrypted: String): String? = runCatching { repository.decryptPassword(encrypted) }.getOrNull()
 
     fun saveAccount(existingId: Long?, originalCreatedAt: Long?, game: String, name: String, price: Long, status: AccountStatus, username: String, plainPassword: String, passwordEncryptedOverride: String?, notes: String, newImageUris: List<Uri>, removedScreenshotIds: List<Long>, onDone: (Long) -> Unit, onError: (Throwable) -> Unit = {}) {
         viewModelScope.launch {
@@ -76,7 +78,7 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
 
     class Factory(private val repository: AccountRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = AccountViewModel(repository) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = AccountViewModel(modelClass as? Class<*>?.let { AccountViewModel::class.java }?.let { AccountViewModel::class.java } as Class<T>)
     }
 }
 
