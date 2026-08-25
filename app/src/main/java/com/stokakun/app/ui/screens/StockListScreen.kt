@@ -1,11 +1,11 @@
 package com.stokakun.app.ui.screens
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
@@ -66,19 +65,13 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
         topBar = {
             TopAppBar(
                 title = { Text(if (selectedIds.isEmpty()) "Daftar Stok" else "${selectedIds.size} dipilih") },
-                navigationIcon = {
-                    IconButton(onClick = { if (selectedIds.isEmpty()) onBack() else clearSelection() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
+                navigationIcon = { IconButton(onClick = { if (selectedIds.isEmpty()) onBack() else clearSelection() }) { Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali") } },
                 actions = {
                     if (selectedIds.isEmpty()) {
                         androidx.compose.foundation.layout.Box {
                             IconButton(onClick = { showSortMenu = true }) { Icon(Icons.Filled.Sort, contentDescription = "Urutkan") }
                             DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                                SortOption.entries.forEach { option ->
-                                    DropdownMenuItem(text = { Text(if (option == sort) "✓ ${option.label}" else option.label) }, onClick = { viewModel.setSort(option); showSortMenu = false })
-                                }
+                                SortOption.entries.forEach { option -> DropdownMenuItem(text = { Text(if (option == sort) "✓ ${option.label}" else option.label) }, onClick = { viewModel.setSort(option); showSortMenu = false }) }
                             }
                         }
                     } else {
@@ -97,9 +90,7 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
         }
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                OutlinedTextField(value = query, onValueChange = viewModel::setSearchQuery, label = { Text("Cari game, nama, atau username") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            }
+            item { OutlinedTextField(value = query, onValueChange = viewModel::setSearchQuery, label = { Text("Cari game, nama, atau username") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item {
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = filter == null, onClick = { viewModel.setStatusFilter(null) }, label = { Text("Semua") })
@@ -113,29 +104,14 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
             items(accounts, key = { it.id }) { account ->
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = account.id in selectedIds,
-                        onClick = { selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id },
-                        label = { Text(if (account.id in selectedIds) "✓" else "○") }
-                    )
-                    StockCard(
-                        account,
-                        shotCount,
-                        { if (selectedIds.isEmpty()) onAccountClick(account.id) else selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id },
-                        Modifier.weight(1f)
-                    )
+                    FilterChip(selected = account.id in selectedIds, onClick = { selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id }, label = { Text(if (account.id in selectedIds) "✓" else "○") })
+                    StockCard(account, shotCount, { if (selectedIds.isEmpty()) onAccountClick(account.id) else selectedIds = if (account.id in selectedIds) selectedIds - account.id else selectedIds + account.id }, Modifier.weight(1f))
                 }
             }
         }
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Hapus ${selectedIds.size} akun?") },
-            text = { Text("Akun yang dipilih beserta screenshot-nya akan dihapus dan tidak bisa dibatalkan.") },
-            confirmButton = { Button(onClick = { viewModel.bulkDelete(selectedIds, { clearSelection(); showDeleteConfirm = false }, { showDeleteConfirm = false }) }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
-        )
+        AlertDialog(onDismissRequest = { showDeleteConfirm = false }, title = { Text("Hapus ${selectedIds.size} akun?") }, text = { Text("Akun yang dipilih beserta screenshot-nya akan dihapus dan tidak bisa dibatalkan.") }, confirmButton = { Button(onClick = { viewModel.bulkDelete(selectedIds, { clearSelection(); showDeleteConfirm = false }, { showDeleteConfirm = false }) }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") } }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } })
     }
 }
