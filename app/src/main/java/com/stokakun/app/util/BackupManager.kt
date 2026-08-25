@@ -150,63 +150,78 @@ object BackupManager {
             val screenshotsJson = json.getJSONArray("screenshots")
             require(accountsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak akun." }
 
+            // Resolve duplicates and decrypt/prepare account data before the transaction.
             val idMap = mutableMapOf<Long, Long>()
-            val newlyInsertedOldIds = mutableSetOf<Long>()
-            database.withTransaction {
-                for (i in 0 until accountsJson.length()) {
-                    val a = accountsJson.getJSONObject(i)
-                    val oldId = a.getLong("id")
-                    val game = a.getString("game").trim()
-                    val name = a.getString("name").trim()
-                    val username = a.getString("username").trim()
-                    require(game.isNotBlank() && name.isNotBlank()) { "Data akun di backup tidak valid." }
-                    val duplicate = accountDao.findDuplicate(game, name, username)
-                    if (duplicate != null) {
-                        idMap[oldId] = duplicate.id
-                        continue
-                    }
-                    val passwordEncrypted = if (version == FORMAT_VERSION) {
-                        val plain = PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!)
-                        CryptoManager.encrypt(plain)
-                    } else {
-                        a.getString("passwordEncrypted")
-                    }
-                    val newId = accountDao.insert(
-                        AccountEntity(
-                            game = game,
-                            name = name,
-                            price = a.getLong("price").coerceAtLeast(0L),
-                            status = AccountStatus.valueOf(a.getString("status")),
-                            username = username,
-                            passwordEncrypted = passwordEncrypted,
-                            notes = a.getString("notes"),
-                            createdAt = a.getLong("createdAt")
-                        )
-                    )
-                    idMap[oldId] = newId
-                    newlyInsertedOldIds += oldId
+            val accountData = mutableListOf<Pair<Long, AccountEntity?>>()
+            for (i in 0 until accountsJson.length()) {
+                val a = accountsJson.getJSONObject(i)
+                val oldId = a.getLong("id")
+                val game = a.getString("game").trim()
+                val name = a.getString("name").trim()
+                val username = a.getString("username").trim()
+                require(game.isNotBlank() && name.isNotBlank()) { "Data akun di backup tidak valid." }
+                val duplicate = accountDao.findDuplicate(game, name, username)
+                if (duplicate != null) {
+                    idMap[oldId] = duplicate.id
+                    accountData += oldId to null
+                    continue
                 }
+                val passwordEncrypted = if (version == FORMAT_VERSION) {
+                    val plain = PortableBackupCrypto.decrypt(a.getString("passwordBackup"), backupPassword!!)
+                    CryptoManager.encrypt(plain)
+                } else {
+                    a.getString("passwordEncrypted")
+                }
+                val status = runCatching { AccountStatus.valueOf(a.getString("status")) }
+                    .getOrElse { throw IllegalArgumentException("Status akun di backup tidak valid.") }
+                accountData += oldId to AccountEntity(
+                    game = game,
+                    name = name,
+                    price = a.getLong("price").coerceAtLeast(0L),
+                    status = status,
+                    username = username,
+                    passwordEncrypted = passwordEncrypted,
+                    notes = a.optString("notes"),
+                    createdAt = a.getLong("createdAt")
+                )
+            }
 
-                for (i in 0 until screenshotsJson.length()) {
-                    val s = screenshotsJson.getJSONObject(i)
-                    val oldAccountId = s.getLong("accountId")
-                    if (oldAccountId !in newlyInsertedOldIds) continue
-                    val newAccountId = idMap[oldAccountId] ?: continue
-                    val zipEntry = s.getString("zipEntry")
-                    val sourceFile = extractedFiles[zipEntry] ?: continue
-                    val newPath = ImageStorageManager.copyLocalFileToStorage(context, sourceFile)
-                        ?: throw IllegalArgumentException("Gagal memulihkan screenshot.")
-                    copiedFiles += newPath
-                    screenshotDao.insert(
-                        ScreenshotEntity(
-                            accountId = newAccountId,
-                            filePath = newPath,
-                            createdAt = s.getLong("createdAt"),
-                            sortOrder = s.getInt("sortOrder")
-                        )
-                    )
+            database.withTransaction {
+                accountData.forEach { (oldId, account) ->
+                    if (account != null) idMap[oldId] = accountDao.insert(account)
                 }
             }
+
+            // Copy screenshot files after account rows exist, outside the DB transaction.
+            val stagedScreenshots = mutableListOf<Pair<ScreenshotEntity, String>>()
+            for (i in 0 until screenshotsJson.length()) {
+                val s = screenshotsJson.getJSONObject(i)
+                val oldAccountId = s.getLong("accountId")
+                val newAccountId = idMap[oldAccountId] ?: continue
+                val zipEntry = s.getString("zipEntry")
+                val sourceFile = extractedFiles[zipEntry] ?: continue
+                val newPath = ImageStorageManager.copyLocalFileToStorage(context, sourceFile)
+                    ?: throw IllegalArgumentException("Gagal memulihkan screenshot.")
+                copiedFiles += newPath
+                stagedScreenshots += ScreenshotEntity(
+                    accountId = newAccountId,
+                    filePath = newPath,
+                    createdAt = s.getLong("createdAt"),
+                    sortOrder = s.getInt("sortOrder")
+                ) to newPath
+            }
+
+            try {
+                database.withTransaction {
+                    if (stagedScreenshots.isNotEmpty()) {
+                        screenshotDao.insertAll(stagedScreenshots.map { it.first })
+                    }
+                }
+            } catch (e: Exception) {
+                // Account rows may have been inserted already; image cleanup is still safe.
+                throw e
+            }
+
             return true
         } catch (e: Exception) {
             ImageStorageManager.deleteFiles(copiedFiles)
