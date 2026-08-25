@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.stokakun.app.data.AccountEntity
 import com.stokakun.app.data.AccountStatus
+import com.stokakun.app.data.GameStat
 import com.stokakun.app.data.ScreenshotEntity
 import com.stokakun.app.repository.AccountRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,6 +26,7 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     val soldCount = repository.getCountByStatus(AccountStatus.SOLD).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val activeStockValue = repository.getActiveStockValue().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
     val soldStockValue = repository.getSoldStockValue().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    val gameStats: StateFlow<List<GameStat>> = repository.getGameStats().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val recentAccounts = repository.getRecent(5).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
