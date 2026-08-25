@@ -12,6 +12,11 @@ class StokAkunApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val db = AppDatabase.getInstance(this)
-        repository = AccountRepository(this, db.accountDao(), db.screenshotDao())
+        repository = AccountRepository(
+            context = this,
+            accountDao = db.accountDao(),
+            screenshotDao = db.screenshotDao(),
+            database = db
+        )
     }
 }
