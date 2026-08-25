@@ -79,7 +79,7 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
             }
             items(accounts, key = { it.id }) { account ->
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
-                StockCard(account, shotCount) { onAccountClick(account.id) }
+                StockCard(account, shotCount, { onAccountClick(account.id) })
             }
         }
     }
