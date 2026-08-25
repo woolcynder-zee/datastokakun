@@ -27,86 +27,32 @@ fun StokAkunNavGraph(viewModel: AccountViewModel) {
     val context = LocalContext.current
     val lockManager = AppLockManager(context)
 
-    fun NavHostController.navigateSingleTop(route: String) {
-        navigate(route) { launchSingleTop = true }
-    }
+    fun NavHostController.navigateSingleTop(route: String) { navigate(route) { launchSingleTop = true } }
 
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
-            HomeScreen(
-                viewModel,
-                { navController.navigateSingleTop(Routes.ADD) },
-                { id -> navController.navigateSingleTop(Routes.detail(id)) },
-                { navController.navigateSingleTop(Routes.LIST) },
-                { navController.navigateSingleTop(Routes.STORAGE) },
-                { navController.navigateSingleTop(Routes.SETTINGS) }
-            )
+            HomeScreen(viewModel, { navController.navigateSingleTop(Routes.ADD) }, { id -> navController.navigateSingleTop(Routes.detail(id)) }, { navController.navigateSingleTop(Routes.LIST) }, { navController.navigateSingleTop(Routes.STORAGE) }, { navController.navigateSingleTop(Routes.SETTINGS) })
         }
         composable(Routes.LIST) {
-            StockListScreen(
-                viewModel,
-                { id -> navController.navigateSingleTop(Routes.detail(id)) },
-                { navController.popBackStack() }
-            )
+            StockListScreen(viewModel, { id -> navController.navigateSingleTop(Routes.detail(id)) }, { navController.popBackStack() })
         }
-        composable(Routes.STORAGE) {
-            StorageScreen(
-                AppDatabase.getInstance(context).screenshotDao(),
-                context,
-                { navController.popBackStack() }
-            )
+        composable(Routes.STORAGE) { StorageScreen(AppDatabase.getInstance(context).screenshotDao(), context) { navController.popBackStack() } }
+        composable(Routes.SETTINGS) { SettingsScreen(lockManager) { navController.popBackStack() } }
+        composable(Routes.ADD) { AddEditAccountScreen(viewModel, null, { navController.popBackStack() }, { navController.popBackStack() }) }
+        composable(Routes.EDIT, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
+            val accountId = entry.arguments?.getLong("accountId")
+            if (accountId != null && accountId > 0) AddEditAccountScreen(viewModel, accountId, { navController.popBackStack() }, { navController.popBackStack() }) else navController.popBackStack()
         }
-        composable(Routes.SETTINGS) {
-            SettingsScreen(lockManager) { navController.popBackStack() }
+        composable(Routes.DETAIL, arguments = listOf(navArgument("accountId") { type = NavType.LongType })) { entry ->
+            val accountId = entry.arguments?.getLong("accountId")
+            if (accountId != null && accountId > 0) {
+                DetailScreen(viewModel, accountId, { navController.popBackStack() }, { id -> navController.navigateSingleTop(Routes.edit(id)) }, { navController.popBackStack() }, { id, index -> navController.navigateSingleTop(Routes.fullscreen(id, index)) })
+            } else navController.popBackStack()
         }
-        composable(Routes.ADD) {
-            AddEditAccountScreen(
-                viewModel,
-                null,
-                { navController.popBackStack() },
-                { navController.popBackStack() }
-            )
-        }
-        composable(
-            Routes.EDIT,
-            arguments = listOf(navArgument("accountId") { type = NavType.LongType })
-        ) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            AddEditAccountScreen(
-                viewModel,
-                accountId,
-                { navController.popBackStack() },
-                { navController.popBackStack() }
-            )
-        }
-        composable(
-            Routes.DETAIL,
-            arguments = listOf(navArgument("accountId") { type = NavType.LongType })
-        ) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            DetailScreen(
-                viewModel,
-                accountId,
-                { navController.popBackStack() },
-                { id -> navController.navigateSingleTop(Routes.edit(id)) },
-                { navController.popBackStack() },
-                { id, index -> navController.navigateSingleTop(Routes.fullscreen(id, index)) }
-            )
-        }
-        composable(
-            Routes.FULLSCREEN,
-            arguments = listOf(
-                navArgument("accountId") { type = NavType.LongType },
-                navArgument("index") { type = NavType.IntType }
-            )
-        ) { entry ->
-            val accountId = entry.arguments?.getLong("accountId") ?: return@composable
-            FullscreenImageScreen(
-                viewModel,
-                accountId,
-                entry.arguments?.getInt("index") ?: 0,
-                { navController.popBackStack() }
-            )
+        composable(Routes.FULLSCREEN, arguments = listOf(navArgument("accountId") { type = NavType.LongType }, navArgument("index") { type = NavType.IntType })) { entry ->
+            val accountId = entry.arguments?.getLong("accountId")
+            val index = entry.arguments?.getInt("index") ?: 0
+            if (accountId != null && accountId > 0) FullscreenImageScreen(viewModel, accountId, index, { navController.popBackStack() }) else navController.popBackStack()
         }
     }
 }
