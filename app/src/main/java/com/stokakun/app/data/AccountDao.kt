@@ -30,6 +30,9 @@ interface AccountDao {
     @Query("SELECT COALESCE(SUM(price), 0) FROM accounts WHERE status = 'SOLD'")
     fun getSoldStockValue(): Flow<Long>
 
+    @Query("SELECT game, COUNT(*) AS total, SUM(CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available, SUM(CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved, SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END) AS sold, COALESCE(SUM(CASE WHEN status != 'SOLD' THEN price ELSE 0 END), 0) AS activeValue FROM accounts GROUP BY game ORDER BY total DESC, game COLLATE NOCASE ASC")
+    fun getGameStats(): Flow<List<GameStat>>
+
     @Query("SELECT * FROM accounts WHERE game = :game AND name = :name AND username = :username LIMIT 1")
     suspend fun findDuplicate(game: String, name: String, username: String): AccountEntity?
 
