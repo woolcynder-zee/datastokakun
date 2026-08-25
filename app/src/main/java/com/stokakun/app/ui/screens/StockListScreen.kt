@@ -12,6 +12,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -24,11 +27,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.stokakun.app.data.AccountStatus
 import com.stokakun.app.ui.components.StockCard
 import com.stokakun.app.viewmodel.AccountViewModel
+import com.stokakun.app.viewmodel.SortOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,14 +43,27 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
     val query by viewModel.searchQuery.collectAsState()
     val filter by viewModel.statusFilter.collectAsState()
     val accounts by viewModel.filteredAccounts.collectAsState()
+    val sort by viewModel.sort.collectAsState()
+    var showSortMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Daftar Stok") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                    IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali") }
+                },
+                actions = {
+                    androidx.compose.foundation.layout.Box {
+                        IconButton(onClick = { showSortMenu = true }) { Icon(Icons.Filled.Sort, contentDescription = "Urutkan") }
+                        DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                            SortOption.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(if (option == sort) "✓ ${option.label}" else option.label) },
+                                    onClick = { viewModel.setSort(option); showSortMenu = false }
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -74,6 +94,7 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
                     FilterChip(selected = filter == AccountStatus.SOLD, onClick = { viewModel.setStatusFilter(AccountStatus.SOLD) }, label = { Text("Sold") })
                 }
             }
+            item { Text("Urutan: ${sort.label}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (accounts.isEmpty()) {
                 item { Text("Tidak ada stok yang cocok.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
