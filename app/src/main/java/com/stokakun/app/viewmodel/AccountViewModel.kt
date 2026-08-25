@@ -78,7 +78,7 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
 
     class Factory(private val repository: AccountRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = AccountViewModel(modelClass as? Class<*>?.let { AccountViewModel::class.java }?.let { AccountViewModel::class.java } as Class<T>)
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = AccountViewModel(repository) as T
     }
 }
 
