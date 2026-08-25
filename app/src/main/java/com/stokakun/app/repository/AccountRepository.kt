@@ -24,19 +24,12 @@ class AccountRepository(
         accountDao.getFiltered(status?.name, query.trim())
 
     fun getRecent(limit: Int = 5): Flow<List<AccountEntity>> = accountDao.getRecent(limit)
-
     fun getAccountById(id: Long): Flow<AccountEntity?> = accountDao.getById(id)
-
     fun getTotalCount(): Flow<Int> = accountDao.getTotalCount()
-
     fun getCountByStatus(status: AccountStatus): Flow<Int> = accountDao.getCountByStatus(status.name)
-
     fun getActiveStockValue(): Flow<Long> = accountDao.getActiveStockValue()
-
     fun getScreenshots(accountId: Long): Flow<List<ScreenshotEntity>> = screenshotDao.getForAccount(accountId)
-
     fun getScreenshotCount(accountId: Long): Flow<Int> = screenshotDao.getCountForAccount(accountId)
-
     fun decryptPassword(encrypted: String): String = CryptoManager.decrypt(encrypted)
 
     suspend fun saveAccount(
@@ -62,15 +55,16 @@ class AccountRepository(
         val normalizedUsername = username.trim()
         val encryptedPassword = passwordEncryptedOverride ?: CryptoManager.encrypt(plainPassword)
         val copiedFiles = mutableListOf<String>()
+        val filesToDelete = mutableListOf<String>()
 
         try {
-            return database.withTransaction {
+            val accountId = database.withTransaction {
                 val duplicate = accountDao.findDuplicate(normalizedGame, normalizedName, normalizedUsername)
                 if (duplicate != null && duplicate.id != existingId) {
                     throw IllegalArgumentException("Akun dengan game, nama/ID, dan username yang sama sudah ada.")
                 }
 
-                val accountId = if (existingId == null) {
+                val id = if (existingId == null) {
                     accountDao.insert(
                         AccountEntity(
                             game = normalizedGame,
@@ -101,24 +95,22 @@ class AccountRepository(
                 }
 
                 if (removedScreenshotIds.isNotEmpty()) {
-                    val all = screenshotDao.getForAccountOnce(accountId)
+                    val all = screenshotDao.getForAccountOnce(id)
                     all.filter { it.id in removedScreenshotIds }.forEach { shot ->
-                        ImageStorageManager.deleteFile(shot.filePath)
+                        filesToDelete += shot.filePath
                         screenshotDao.delete(shot)
                     }
                 }
 
                 if (newImageUris.isNotEmpty()) {
-                    val nextSortOrder = screenshotDao.getForAccountOnce(accountId)
-                        .maxOfOrNull { it.sortOrder }
-                        ?.plus(1) ?: 0
-
-                    val newEntities = newImageUris.mapIndexedNotNull { index, uri ->
+                    val nextSortOrder = screenshotDao.getForAccountOnce(id)
+                        .maxOfOrNull { it.sortOrder }?.plus(1) ?: 0
+                    val newEntities = newImageUris.mapIndexed { index, uri ->
                         val path = ImageStorageManager.copyImageToLocalStorage(context, uri)
                             ?: throw IllegalArgumentException("Gagal membaca salah satu screenshot.")
                         copiedFiles += path
                         ScreenshotEntity(
-                            accountId = accountId,
+                            accountId = id,
                             filePath = path,
                             createdAt = System.currentTimeMillis(),
                             sortOrder = nextSortOrder + index
@@ -126,22 +118,23 @@ class AccountRepository(
                     }
                     screenshotDao.insertAll(newEntities)
                 }
-
-                accountId
+                id
             }
+            ImageStorageManager.deleteFiles(filesToDelete)
+            return accountId
         } catch (e: Throwable) {
-            // Room rolls back database writes; remove files that were copied before a failure.
             ImageStorageManager.deleteFiles(copiedFiles)
             throw e
         }
     }
 
     suspend fun deleteAccount(account: AccountEntity) {
-        database.withTransaction {
+        val filesToDelete = database.withTransaction {
             val shots = screenshotDao.getForAccountOnce(account.id)
-            ImageStorageManager.deleteFiles(shots.map { it.filePath })
             screenshotDao.deleteAllForAccount(account.id)
             accountDao.delete(account)
+            shots.map { it.filePath }
         }
+        ImageStorageManager.deleteFiles(filesToDelete)
     }
 }
