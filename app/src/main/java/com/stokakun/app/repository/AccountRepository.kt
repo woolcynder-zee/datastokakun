@@ -39,16 +39,24 @@ class AccountRepository(
         val encryptedPassword = passwordEncryptedOverride ?: CryptoManager.encrypt(plainPassword)
         val copiedFiles = mutableListOf<String>()
         val filesToDelete = mutableListOf<String>()
-        try {
+
+        return try {
             val accountId = database.withTransaction {
                 val duplicate = accountDao.findDuplicate(normalizedGame, normalizedName, normalizedUsername)
-                if (duplicate != null && duplicate.id != existingId) throw IllegalArgumentException("Akun dengan game, nama/ID, dan username yang sama sudah ada.")
-                val id = if (existingId == null) accountDao.insert(AccountEntity(game = normalizedGame, name = normalizedName, price = price, status = status, username = normalizedUsername, passwordEncrypted = encryptedPassword, notes = notes.trim(), createdAt = System.currentTimeMillis())) else {
+                if (duplicate != null && duplicate.id != existingId) {
+                    throw IllegalArgumentException("Akun dengan game, nama/ID, dan username yang sama sudah ada.")
+                }
+                val id = if (existingId == null) {
+                    accountDao.insert(AccountEntity(game = normalizedGame, name = normalizedName, price = price, status = status, username = normalizedUsername, passwordEncrypted = encryptedPassword, notes = notes.trim(), createdAt = System.currentTimeMillis()))
+                } else {
                     accountDao.update(AccountEntity(id = existingId, game = normalizedGame, name = normalizedName, price = price, status = status, username = normalizedUsername, passwordEncrypted = encryptedPassword, notes = notes.trim(), createdAt = originalCreatedAt ?: System.currentTimeMillis()))
                     existingId
                 }
                 if (removedScreenshotIds.isNotEmpty()) {
-                    screenshotDao.getForAccountOnce(id).filter { it.id in removedScreenshotIds }.forEach { shot -> filesToDelete += shot.filePath; screenshotDao.delete(shot) }
+                    screenshotDao.getForAccountOnce(id).filter { it.id in removedScreenshotIds }.forEach { shot ->
+                        filesToDelete += shot.filePath
+                        screenshotDao.delete(shot)
+                    }
                 }
                 if (newImageUris.isNotEmpty()) {
                     val nextSortOrder = screenshotDao.getForAccountOnce(id).maxOfOrNull { it.sortOrder }?.plus(1) ?: 0
