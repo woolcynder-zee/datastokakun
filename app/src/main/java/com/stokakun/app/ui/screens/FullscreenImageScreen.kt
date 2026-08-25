@@ -7,9 +7,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -19,12 +19,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import com.stokakun.app.viewmodel.AccountViewModel
 import coil.compose.AsyncImage
+import com.stokakun.app.viewmodel.AccountViewModel
 import java.io.File
 
-@androidx.compose.material3.ExperimentalMaterial3Api
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullscreenImageScreen(
     viewModel: AccountViewModel,
@@ -37,21 +38,24 @@ fun FullscreenImageScreen(
         onBack()
         return
     }
+
     val safeInitialIndex = initialIndex.coerceIn(0, screenshots.size - 1)
     val pagerState = rememberPagerState(initialPage = safeInitialIndex) { screenshots.size }
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Black,
+        containerColor = Color.Black,
         topBar = {
             TopAppBar(
                 title = { Text("${pagerState.currentPage + 1} / ${screenshots.size}") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali", tint = MaterialTheme.colorScheme.onBackground)
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.Black
+                    containerColor = Color.Black,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
                 )
             )
         }
@@ -60,15 +64,13 @@ fun FullscreenImageScreen(
             state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color.Black)
+                .background(Color.Black)
+                .padding(padding)
         ) { page ->
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(
                     model = File(screenshots[page].filePath),
-                    contentDescription = null,
+                    contentDescription = "Screenshot ${page + 1}",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
