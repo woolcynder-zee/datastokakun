@@ -1,6 +1,7 @@
 package com.stokakun.app
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,28 @@ import com.stokakun.app.util.AppLockManager
 import com.stokakun.app.viewmodel.AccountViewModel
 
 class MainActivity : ComponentActivity() {
+    private var backgroundAt: Long? = null
+
+    override fun onStart() {
+        super.onStart()
+        val startedAt = backgroundAt
+        if (startedAt != null && SystemClock.elapsedRealtime() - startedAt >= LOCK_AFTER_BACKGROUND_MS) {
+            backgroundAt = null
+            setLockState(true)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) backgroundAt = SystemClock.elapsedRealtime()
+    }
+
+    private var lockStateSetter: ((Boolean) -> Unit)? = null
+
+    private fun setLockState(locked: Boolean) {
+        lockStateSetter?.invoke(locked)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as StokAkunApp
@@ -32,16 +55,26 @@ class MainActivity : ComponentActivity() {
             StokAkunTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     var unlocked by remember { mutableStateOf(!lockManager.isEnabled) }
+                    lockStateSetter = { locked ->
+                        if (!lockManager.isEnabled) {
+                            unlocked = true
+                        } else if (locked) {
+                            unlocked = false
+                        }
+                    }
                     val lifecycleOwner = LocalLifecycleOwner.current
 
                     DisposableEffect(lifecycleOwner, lockManager.isEnabled) {
                         val observer = LifecycleEventObserver { _, event ->
-                            if (event == Lifecycle.Event.ON_STOP && lockManager.isEnabled) {
-                                unlocked = false
+                            if (event == Lifecycle.Event.ON_DESTROY) {
+                                lockStateSetter = null
                             }
                         }
                         lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
+                            lockStateSetter = null
+                        }
                     }
 
                     if (unlocked) {
@@ -50,12 +83,19 @@ class MainActivity : ComponentActivity() {
                     } else {
                         LockScreen { pin ->
                             val verified = lockManager.verifyPin(pin)
-                            if (verified) unlocked = true
+                            if (verified) {
+                                backgroundAt = null
+                                unlocked = true
+                            }
                             verified
                         }
                     }
                 }
             }
         }
+    }
+
+    companion object {
+        private const val LOCK_AFTER_BACKGROUND_MS = 30_000L
     }
 }
