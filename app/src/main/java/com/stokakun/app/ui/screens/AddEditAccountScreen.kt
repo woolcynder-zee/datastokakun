@@ -139,6 +139,8 @@ fun AddEditAccountScreen(
         existing + added
     }
 
+    val parsedPrice = price.toLongOrNull()
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -164,9 +166,13 @@ fun AddEditAccountScreen(
                     value = price,
                     onValueChange = { input -> price = input.filter { it.isDigit() } },
                     label = { Text("Harga (Rp)") },
+                    isError = price.isNotEmpty() && parsedPrice == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (price.isNotEmpty() && parsedPrice == null) {
+                    Text("Masukkan harga yang valid.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
             item {
                 ExposedDropdownMenuBox(expanded = statusMenuExpanded, onExpandedChange = { statusMenuExpanded = it }) {
@@ -224,14 +230,18 @@ fun AddEditAccountScreen(
             item {
                 Button(
                     onClick = {
-                        val priceValue = price.toLongOrNull() ?: 0L
+                        val safePrice = parsedPrice
+                        if (safePrice == null) {
+                            scope.launch { snackbarHostState.showSnackbar("Harga belum valid.") }
+                            return@Button
+                        }
                         val unchangedPassword = isEdit && password == initialPassword
                         viewModel.saveAccount(
                             existingId = accountId,
                             originalCreatedAt = existingAccount?.createdAt,
                             game = game.trim(),
                             name = name.trim(),
-                            price = priceValue,
+                            price = safePrice,
                             status = status,
                             username = username.trim(),
                             plainPassword = password,
@@ -243,7 +253,7 @@ fun AddEditAccountScreen(
                             onError = { error -> scope.launch { snackbarHostState.showSnackbar(error.message ?: "Gagal menyimpan akun.") } }
                         )
                     },
-                    enabled = game.isNotBlank() && name.isNotBlank(),
+                    enabled = game.isNotBlank() && name.isNotBlank() && parsedPrice != null,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Simpan") }
             }
