@@ -25,22 +25,14 @@ object BackupManager {
     private const val MAX_ENTRIES = 2000
     private const val MAX_UNCOMPRESSED_BYTES = 512L * 1024L * 1024L
 
-    suspend fun export(
-        context: Context,
-        destUri: Uri,
-        accountDao: AccountDao,
-        screenshotDao: ScreenshotDao,
-        backupPassword: String
-    ) {
+    suspend fun export(context: Context, destUri: Uri, accountDao: AccountDao, screenshotDao: ScreenshotDao, backupPassword: String) {
         require(backupPassword.length >= 8) { "Password backup minimal 8 karakter." }
         val accounts = accountDao.getAllOnce()
         val screenshots = screenshotDao.getAllOnce()
         val accountsJson = JSONArray()
         accounts.forEach { acc ->
             val plainPassword = CryptoManager.decryptOrNull(acc.passwordEncrypted)
-                ?: throw IllegalArgumentException(
-                    "Tidak bisa membaca password akun ${acc.name}. Data mungkin berasal dari instalasi lama atau Keystore tidak tersedia."
-                )
+                ?: throw IllegalArgumentException("Tidak bisa membaca password akun ${acc.name}. Data mungkin berasal dari instalasi lama atau Keystore tidak tersedia.")
             accountsJson.put(JSONObject().apply {
                 put("id", acc.id)
                 put("game", acc.game)
@@ -86,14 +78,7 @@ object BackupManager {
         } ?: error("Tidak dapat membuka lokasi backup.")
     }
 
-    suspend fun import(
-        context: Context,
-        sourceUri: Uri,
-        database: AppDatabase,
-        accountDao: AccountDao,
-        screenshotDao: ScreenshotDao,
-        backupPassword: String?
-    ): Boolean {
+    suspend fun import(context: Context, sourceUri: Uri, database: AppDatabase, accountDao: AccountDao, screenshotDao: ScreenshotDao, backupPassword: String?): Boolean {
         val tempDir = File(context.cacheDir, "backup_import_${UUID.randomUUID()}")
         require(tempDir.mkdirs()) { "Tidak dapat membuat folder sementara." }
         val copiedFiles = mutableListOf<String>()
@@ -155,18 +140,19 @@ object BackupManager {
             require(screenshotsJson.length() <= MAX_ENTRIES) { "Backup berisi terlalu banyak screenshot." }
 
             val idMap = mutableMapOf<Long, Long>()
+            val skippedDuplicateAccountIds = mutableSetOf<Long>()
             val accountData = mutableListOf<Pair<Long, AccountEntity?>>()
             for (i in 0 until accountsJson.length()) {
                 val a = accountsJson.getJSONObject(i)
                 val oldId = a.getLong("id")
-                require(idMap[oldId] == null) { "Backup memiliki ID akun duplikat." }
+                require(!idMap.containsKey(oldId) && oldId !in skippedDuplicateAccountIds) { "Backup memiliki ID akun duplikat." }
                 val game = a.getString("game").trim()
                 val name = a.getString("name").trim()
                 val username = a.getString("username").trim()
                 require(game.isNotBlank() && name.isNotBlank()) { "Data akun di backup tidak valid." }
                 val duplicate = accountDao.findDuplicate(game, name, username)
                 if (duplicate != null) {
-                    idMap[oldId] = duplicate.id
+                    skippedDuplicateAccountIds += oldId
                     accountData += oldId to null
                     continue
                 }
@@ -204,6 +190,7 @@ object BackupManager {
             for (i in 0 until screenshotsJson.length()) {
                 val s = screenshotsJson.getJSONObject(i)
                 val oldAccountId = s.getLong("accountId")
+                if (oldAccountId in skippedDuplicateAccountIds) continue
                 val newAccountId = idMap[oldAccountId]
                     ?: throw IllegalArgumentException("Screenshot merujuk akun yang tidak ada: $oldAccountId")
                 val zipEntry = s.getString("zipEntry")
@@ -221,11 +208,8 @@ object BackupManager {
             }
 
             database.withTransaction {
-                if (stagedScreenshots.isNotEmpty()) {
-                    screenshotDao.insertAll(stagedScreenshots)
-                }
+                if (stagedScreenshots.isNotEmpty()) screenshotDao.insertAll(stagedScreenshots)
             }
-
             return true
         } catch (e: Exception) {
             if (insertedAccountIds.isNotEmpty()) {
