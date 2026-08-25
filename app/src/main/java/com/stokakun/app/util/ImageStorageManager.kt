@@ -13,6 +13,8 @@ import java.util.UUID
 object ImageStorageManager {
     private const val FOLDER_NAME = "screenshots"
     private const val MAX_IMAGE_BYTES = 25L * 1024L * 1024L
+    private const val MAX_IMAGE_PIXELS = 40_000_000L
+    private const val MAX_IMAGE_DIMENSION = 12_000
 
     private fun screenshotsDir(context: Context): File {
         val dir = File(context.filesDir, FOLDER_NAME)
@@ -82,7 +84,11 @@ object ImageStorageManager {
     private fun isReadableImage(file: File): Boolean {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, options)
-        return options.outWidth > 0 && options.outHeight > 0
+        val width = options.outWidth
+        val height = options.outHeight
+        if (width <= 0 || height <= 0) return false
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) return false
+        return width.toLong() * height.toLong() <= MAX_IMAGE_PIXELS
     }
 
     fun deleteFile(path: String) {
