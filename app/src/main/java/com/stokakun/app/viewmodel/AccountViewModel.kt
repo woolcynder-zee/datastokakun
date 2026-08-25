@@ -18,7 +18,6 @@ import kotlinx.coroutines.launch
 
 class AccountViewModel(private val repository: AccountRepository) : ViewModel() {
 
-    // ---- Beranda ----
     val totalCount: StateFlow<Int> = repository.getTotalCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
@@ -34,7 +33,6 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
     val recentAccounts: StateFlow<List<AccountEntity>> = repository.getRecent(5)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // ---- Daftar stok: search + filter ----
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
@@ -59,7 +57,6 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         repository.getScreenshotCount(accountId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // ---- Detail / Edit ----
     fun accountFlow(id: Long): StateFlow<AccountEntity?> =
         repository.getAccountById(id)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -79,24 +76,42 @@ class AccountViewModel(private val repository: AccountRepository) : ViewModel() 
         status: AccountStatus,
         username: String,
         plainPassword: String,
+        passwordEncryptedOverride: String?,
         notes: String,
         newImageUris: List<Uri>,
         removedScreenshotIds: List<Long>,
-        onDone: (Long) -> Unit
+        onDone: (Long) -> Unit,
+        onError: (Throwable) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val id = repository.saveAccount(
-                existingId, originalCreatedAt, game, name, price, status,
-                username, plainPassword, notes, newImageUris, removedScreenshotIds
-            )
-            onDone(id)
+            runCatching {
+                repository.saveAccount(
+                    existingId,
+                    originalCreatedAt,
+                    game,
+                    name,
+                    price,
+                    status,
+                    username,
+                    plainPassword,
+                    passwordEncryptedOverride,
+                    notes,
+                    newImageUris,
+                    removedScreenshotIds
+                )
+            }.onSuccess(onDone).onFailure(onError)
         }
     }
 
-    fun deleteAccount(account: AccountEntity, onDone: () -> Unit) {
+    fun deleteAccount(
+        account: AccountEntity,
+        onDone: () -> Unit,
+        onError: (Throwable) -> Unit = {}
+    ) {
         viewModelScope.launch {
-            repository.deleteAccount(account)
-            onDone()
+            runCatching { repository.deleteAccount(account) }
+                .onSuccess { onDone() }
+                .onFailure(onError)
         }
     }
 
