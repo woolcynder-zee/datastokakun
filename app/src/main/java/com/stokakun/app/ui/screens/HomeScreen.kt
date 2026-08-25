@@ -56,6 +56,7 @@ fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountCli
     val reserved by viewModel.reservedCount.collectAsState()
     val sold by viewModel.soldCount.collectAsState()
     val activeValue by viewModel.activeStockValue.collectAsState()
+    val soldValue by viewModel.soldStockValue.collectAsState()
     val recent by viewModel.recentAccounts.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,6 +91,7 @@ fun HomeScreen(viewModel: AccountViewModel, onAddClick: () -> Unit, onAccountCli
             item { SummaryCard(label = "Nilai Stok Aktif", value = formatPrice(activeValue), modifier = Modifier.fillMaxWidth()) }
             item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Total Stok", value = total.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Available", value = available.toString(), modifier = Modifier.weight(1f)) } }
             item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Reserved", value = reserved.toString(), modifier = Modifier.weight(1f)); SummaryCard(label = "Sold", value = sold.toString(), modifier = Modifier.weight(1f)) } }
+            item { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { SummaryCard(label = "Nilai Terjual", value = formatPrice(soldValue), modifier = Modifier.weight(1f)); SummaryCard(label = "Akun Terjual", value = sold.toString(), modifier = Modifier.weight(1f)) } }
             item { Spacer(modifier = Modifier.height(4.dp)); Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium) }
             if (recent.isEmpty()) item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(recent, key = { it.id }) { account ->
