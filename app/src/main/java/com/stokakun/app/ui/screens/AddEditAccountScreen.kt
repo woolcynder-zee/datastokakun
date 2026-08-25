@@ -2,7 +2,7 @@ package com.stokakun.app.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.compose.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +42,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,32 +66,14 @@ import com.stokakun.app.viewmodel.AccountViewModel
 import java.io.File
 import kotlinx.coroutines.launch
 
-private data class ThumbItem(
-    val key: String,
-    val isExisting: Boolean,
-    val existingId: Long? = null,
-    val existingPath: String? = null,
-    val newUri: Uri? = null
-)
+private data class ThumbItem(val key: String, val isExisting: Boolean, val existingId: Long? = null, val existingPath: String? = null, val newUri: Uri? = null)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditAccountScreen(
-    viewModel: AccountViewModel,
-    accountId: Long?,
-    onSaved: () -> Unit,
-    onBack: () -> Unit
-) {
+fun AddEditAccountScreen(viewModel: AccountViewModel, accountId: Long?, onSaved: () -> Unit, onBack: () -> Unit) {
     val isEdit = accountId != null
-    val existingAccount: AccountEntity? = if (isEdit) {
-        val state by viewModel.accountFlow(accountId!!).collectAsState()
-        state
-    } else null
-    val existingScreenshots: List<ScreenshotEntity> = if (isEdit) {
-        val state by viewModel.screenshotsFlow(accountId!!).collectAsState()
-        state
-    } else emptyList()
-
+    val existingAccount: AccountEntity? = if (isEdit) { val state by viewModel.accountFlow(accountId!!).collectAsState(); state } else null
+    val existingScreenshots: List<ScreenshotEntity> = if (isEdit) { val state by viewModel.screenshotsFlow(accountId!!).collectAsState(); state } else emptyList()
     var game by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
@@ -107,187 +90,75 @@ fun AddEditAccountScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    if (isEdit && !initialized && existingAccount != null) {
-        val acc = existingAccount
-        game = acc.game
-        name = acc.name
-        price = acc.price.toString()
-        status = acc.status
-        username = acc.username
-        try {
-            password = viewModel.decryptPassword(acc.passwordEncrypted)
-        } catch (e: Exception) {
-            password = ""
-            scope.launch { snackbarHostState.showSnackbar("Peringatan: Gagal mendekripsi password: ${e.message}") }
+    LaunchedEffect(existingAccount?.id) {
+        if (isEdit && existingAccount != null && !initialized) {
+            val acc = existingAccount
+            game = acc.game
+            name = acc.name
+            price = acc.price.toString()
+            status = acc.status
+            username = acc.username
+            try {
+                password = viewModel.decryptPassword(acc.passwordEncrypted)
+            } catch (e: Exception) {
+                password = ""
+                scope.launch { snackbarHostState.showSnackbar("Peringatan: password lama tidak dapat dibaca. Masukkan ulang password sebelum menyimpan.") }
+            }
+            initialPassword = password
+            notes = acc.notes
+            initialized = true
         }
-        initialPassword = password
-        notes = acc.notes
-        initialized = true
     }
 
-    val pickImagesLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) newImages = newImages + uris
-    }
-
+    val pickImagesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris -> if (uris.isNotEmpty()) newImages = newImages + uris }
     val visibleThumbs = remember(existingScreenshots, newImages, removedExistingIds) {
-        val existing = existingScreenshots
-            .filter { it.id !in removedExistingIds }
-            .map { ThumbItem("e${it.id}", true, it.id, it.filePath) }
-        val added = newImages.mapIndexed { idx, uri ->
-            ThumbItem("n$idx-$uri", false, newUri = uri)
-        }
-        existing + added
+        existingScreenshots.filter { it.id !in removedExistingIds }.map { ThumbItem("e${it.id}", true, it.id, it.filePath) } + newImages.mapIndexed { idx, uri -> ThumbItem("n$idx-$uri", false, newUri = uri) }
     }
+    val parsedPrice = price.toLongOrNull()
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEdit) "Edit Akun" else "Tambah Akun") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, topBar = {
+        TopAppBar(title = { Text(if (isEdit) "Edit Akun" else "Tambah Akun") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali") } })
+    }) { padding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { OutlinedTextField(value = game, onValueChange = { game = it }, label = { Text("Game") }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama / ID Stok") }, modifier = Modifier.fillMaxWidth()) }
             item {
-                OutlinedTextField(
-                    value = price,
-                    onValueChange = { input -> price = input.filter { it.isDigit() } },
-                    label = { Text("Harga (Rp)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                OutlinedTextField(value = price, onValueChange = { input -> price = input.filter { it.isDigit() } }, label = { Text("Harga (Rp)") }, isError = price.isNotEmpty() && parsedPrice == null, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                if (price.isNotEmpty() && parsedPrice == null) Text("Masukkan harga yang valid.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             item {
                 ExposedDropdownMenuBox(expanded = statusMenuExpanded, onExpandedChange = { statusMenuExpanded = it }) {
-                    OutlinedTextField(
-                        value = statusLabel(status), onValueChange = {}, readOnly = true,
-                        label = { Text("Status") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusMenuExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
-                    )
-                    DropdownMenu(expanded = statusMenuExpanded, onDismissRequest = { statusMenuExpanded = false }) {
-                        AccountStatus.entries.forEach { option ->
-                            DropdownMenuItem(text = { Text(statusLabel(option)) }, onClick = {
-                                status = option
-                                statusMenuExpanded = false
-                            })
-                        }
-                    }
+                    OutlinedTextField(value = statusLabel(status), onValueChange = {}, readOnly = true, label = { Text("Status") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusMenuExpanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
+                    DropdownMenu(expanded = statusMenuExpanded, onDismissRequest = { statusMenuExpanded = false }) { AccountStatus.entries.forEach { option -> DropdownMenuItem(text = { Text(statusLabel(option)) }, onClick = { status = option; statusMenuExpanded = false }) } }
                 }
             }
             item { OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Email / Username") }, modifier = Modifier.fillMaxWidth()) }
-            item {
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "Tampilkan password")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            item { OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "Tampilkan password") } }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Catatan") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
             item { Text("Fullspek (${visibleThumbs.size} screenshot)", style = MaterialTheme.typography.titleMedium) }
+            item { OutlinedButton(onClick = { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null); Text("  Tambah Screenshot") } }
+            item { ThumbnailGrid(visibleThumbs) { thumb -> if (thumb.isExisting && thumb.existingId != null) removedExistingIds = removedExistingIds + thumb.existingId else if (thumb.newUri != null) newImages = newImages - thumb.newUri } }
             item {
-                OutlinedButton(
-                    onClick = { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null)
-                    Text("  Tambah Screenshot")
-                }
-            }
-            item {
-                ThumbnailGrid(visibleThumbs) { thumb ->
-                    if (thumb.isExisting && thumb.existingId != null) {
-                        removedExistingIds = removedExistingIds + thumb.existingId
-                    } else if (thumb.newUri != null) {
-                        newImages = newImages - thumb.newUri
-                    }
-                }
-            }
-            item {
-                Button(
-                    onClick = {
-                        val priceValue = price.toLongOrNull() ?: 0L
-                        val unchangedPassword = isEdit && password == initialPassword
-                        viewModel.saveAccount(
-                            existingId = accountId,
-                            originalCreatedAt = existingAccount?.createdAt,
-                            game = game.trim(),
-                            name = name.trim(),
-                            price = priceValue,
-                            status = status,
-                            username = username.trim(),
-                            plainPassword = password,
-                            passwordEncryptedOverride = if (unchangedPassword) existingAccount?.passwordEncrypted else null,
-                            notes = notes.trim(),
-                            newImageUris = newImages,
-                            removedScreenshotIds = removedExistingIds,
-                            onDone = { onSaved() },
-                            onError = { error -> scope.launch { snackbarHostState.showSnackbar(error.message ?: "Gagal menyimpan akun.") } }
-                        )
-                    },
-                    enabled = game.isNotBlank() && name.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Simpan") }
+                Button(onClick = {
+                    val safePrice = parsedPrice
+                    if (safePrice == null) { scope.launch { snackbarHostState.showSnackbar("Harga belum valid.") }; return@Button }
+                    val unchangedPassword = isEdit && password == initialPassword
+                    viewModel.saveAccount(existingId = accountId, originalCreatedAt = existingAccount?.createdAt, game = game.trim(), name = name.trim(), price = safePrice, status = status, username = username.trim(), plainPassword = password, passwordEncryptedOverride = if (unchangedPassword) existingAccount?.passwordEncrypted else null, notes = notes.trim(), newImageUris = newImages, removedScreenshotIds = removedExistingIds, onDone = { onSaved() }, onError = { error -> scope.launch { snackbarHostState.showSnackbar(error.message ?: "Gagal menyimpan akun.") } })
+                }, enabled = game.isNotBlank() && name.isNotBlank() && parsedPrice != null, modifier = Modifier.fillMaxWidth()) { Text("Simpan") }
             }
         }
     }
 }
 
-@Composable
-private fun ThumbnailGrid(thumbs: List<ThumbItem>, onRemove: (ThumbItem) -> Unit) {
-    val columns = 3
-    val rows = (thumbs.size + columns - 1) / columns
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (row in 0 until rows) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                for (col in 0 until columns) {
-                    val index = row * columns + col
-                    if (index < thumbs.size) {
-                        ThumbnailCell(thumbs[index], onRemove, Modifier.weight(1f))
-                    } else Box(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
+@Composable private fun ThumbnailGrid(thumbs: List<ThumbItem>, onRemove: (ThumbItem) -> Unit) {
+    val columns = 3; val rows = (thumbs.size + columns - 1) / columns
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { for (row in 0 until rows) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) { for (col in 0 until columns) { val index = row * columns + col; if (index < thumbs.size) ThumbnailCell(thumbs[index], onRemove, Modifier.weight(1f)) else Box(modifier = Modifier.weight(1f)) } } }
 }
 
-@Composable
-private fun ThumbnailCell(thumb: ThumbItem, onRemove: (ThumbItem) -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-    ) {
+@Composable private fun ThumbnailCell(thumb: ThumbItem, onRemove: (ThumbItem) -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))) {
         val model: Any? = if (thumb.isExisting) File(thumb.existingPath ?: "") else thumb.newUri
-        AsyncImage(
-            model = model,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
-        )
-        IconButton(
-            onClick = { onRemove(thumb) },
-            modifier = Modifier.align(Alignment.TopEnd).size(28.dp).background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape)
-        ) {
-            Icon(Icons.Filled.Close, contentDescription = "Hapus screenshot", modifier = Modifier.size(16.dp))
-        }
+        AsyncImage(model = model, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)))
+        IconButton(onClick = { onRemove(thumb) }, modifier = Modifier.align(Alignment.TopEnd).size(28.dp).background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape)) { Icon(Icons.Filled.Close, contentDescription = "Hapus screenshot", modifier = Modifier.size(16.dp)) }
     }
 }
