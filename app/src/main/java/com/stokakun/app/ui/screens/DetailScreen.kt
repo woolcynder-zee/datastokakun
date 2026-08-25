@@ -55,6 +55,7 @@ import com.stokakun.app.ui.components.StatusBadge
 import com.stokakun.app.ui.components.formatPrice
 import com.stokakun.app.viewmodel.AccountViewModel
 import java.io.File
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +79,11 @@ fun DetailScreen(
     fun copyText(label: String, value: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
-        scope.launch { snackbarHostState.showSnackbar("$label disalin.") }
+        scope.launch {
+            snackbarHostState.showSnackbar("$label disalin. Clipboard akan dibersihkan otomatis.")
+            delay(30_000)
+            runCatching { clipboard.clearPrimaryClip() }
+        }
     }
 
     fun shareAccount(username: String, password: String) {
