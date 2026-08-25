@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ import com.stokakun.app.data.AccountStatus
 import com.stokakun.app.ui.components.StockCard
 import com.stokakun.app.viewmodel.AccountViewModel
 import com.stokakun.app.viewmodel.SortOption
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,8 +58,12 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     fun clearSelection() { selectedIds = emptySet() }
+    fun showError(error: Throwable) {
+        scope.launch { snackbar.showSnackbar(error.message ?: "Operasi gagal. Silakan coba lagi.") }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -70,16 +76,27 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
                         androidx.compose.foundation.layout.Box {
                             IconButton(onClick = { showSortMenu = true }) { Icon(Icons.Filled.Sort, contentDescription = "Urutkan") }
                             DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                                SortOption.entries.forEach { option -> DropdownMenuItem(text = { Text(if (option == sort) "✓ ${option.label}" else option.label) }, onClick = { viewModel.setSort(option); showSortMenu = false }) }
+                                SortOption.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (option == sort) "✓ ${option.label}" else option.label) },
+                                        onClick = { viewModel.setSort(option); showSortMenu = false }
+                                    )
+                                }
                             }
                         }
                     } else {
                         androidx.compose.foundation.layout.Box {
                             IconButton(onClick = { showBulkMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Aksi massal") }
                             DropdownMenu(expanded = showBulkMenu, onDismissRequest = { showBulkMenu = false }) {
-                                DropdownMenuItem(text = { Text("Tandai Available") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.AVAILABLE, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
-                                DropdownMenuItem(text = { Text("Tandai Reserved") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.RESERVED, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
-                                DropdownMenuItem(text = { Text("Tandai Sold") }, onClick = { viewModel.bulkUpdateStatus(selectedIds, AccountStatus.SOLD, { clearSelection(); showBulkMenu = false }, { showBulkMenu = false }) })
+                                DropdownMenuItem(text = { Text("Tandai Available") }, onClick = {
+                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.AVAILABLE, { clearSelection(); showBulkMenu = false }) { error -> showBulkMenu = false; showError(error) }
+                                })
+                                DropdownMenuItem(text = { Text("Tandai Reserved") }, onClick = {
+                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.RESERVED, { clearSelection(); showBulkMenu = false }) { error -> showBulkMenu = false; showError(error) }
+                                })
+                                DropdownMenuItem(text = { Text("Tandai Sold") }, onClick = {
+                                    viewModel.bulkUpdateStatus(selectedIds, AccountStatus.SOLD, { clearSelection(); showBulkMenu = false }) { error -> showBulkMenu = false; showError(error) }
+                                })
                                 DropdownMenuItem(text = { Text("Hapus yang dipilih") }, onClick = { showBulkMenu = false; showDeleteConfirm = true })
                             }
                         }
@@ -111,6 +128,20 @@ fun StockListScreen(viewModel: AccountViewModel, onAccountClick: (Long) -> Unit,
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(onDismissRequest = { showDeleteConfirm = false }, title = { Text("Hapus ${selectedIds.size} akun?") }, text = { Text("Akun yang dipilih beserta screenshot-nya akan dihapus dan tidak bisa dibatalkan.") }, confirmButton = { Button(onClick = { viewModel.bulkDelete(selectedIds, { clearSelection(); showDeleteConfirm = false }, { showDeleteConfirm = false }) }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") } }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } })
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Hapus ${selectedIds.size} akun?") },
+            text = { Text("Akun yang dipilih beserta screenshot-nya akan dihapus dan tidak bisa dibatalkan.") },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.bulkDelete(
+                        selectedIds,
+                        onDone = { count -> clearSelection(); showDeleteConfirm = false; scope.launch { snackbar.showSnackbar("$count akun berhasil dihapus.") } },
+                        onError = { error -> showDeleteConfirm = false; showError(error) }
+                    )
+                }) { Icon(Icons.Filled.Delete, contentDescription = null); Text(" Hapus") }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
+        )
     }
 }
