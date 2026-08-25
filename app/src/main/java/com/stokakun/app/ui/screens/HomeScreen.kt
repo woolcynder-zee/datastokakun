@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.stokakun.app.data.AppDatabase
 import com.stokakun.app.ui.components.StockCard
+import com.stokakun.app.ui.components.formatPrice
 import com.stokakun.app.util.BackupManager
 import com.stokakun.app.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
@@ -57,68 +58,47 @@ fun HomeScreen(
     val available by viewModel.availableCount.collectAsState()
     val reserved by viewModel.reservedCount.collectAsState()
     val sold by viewModel.soldCount.collectAsState()
+    val activeValue by viewModel.activeStockValue.collectAsState()
     val recent by viewModel.recentAccounts.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                runCatching {
-                    val db = AppDatabase.getInstance(context)
-                    BackupManager.export(context, uri, db.accountDao(), db.screenshotDao())
-                }.onSuccess {
-                    snackbarHostState.showSnackbar("Backup berhasil diekspor.")
-                }.onFailure {
-                    snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}")
-                }
-            }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val db = AppDatabase.getInstance(context)
+                BackupManager.export(context, uri, db.accountDao(), db.screenshotDao())
+            }.onSuccess { snackbarHostState.showSnackbar("Backup berhasil diekspor.") }
+                .onFailure { snackbarHostState.showSnackbar("Gagal mengekspor backup: ${it.message ?: "kesalahan tidak diketahui"}") }
         }
     }
 
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                runCatching {
-                    val db = AppDatabase.getInstance(context)
-                    BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao())
-                }.onSuccess { success ->
-                    snackbarHostState.showSnackbar(
-                        if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup."
-                    )
-                }.onFailure {
-                    snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}")
-                }
-            }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val db = AppDatabase.getInstance(context)
+                BackupManager.import(context, uri, db, db.accountDao(), db.screenshotDao())
+            }.onSuccess { success ->
+                snackbarHostState.showSnackbar(if (success) "Backup berhasil diimpor. Data duplikat otomatis dilewati." else "Gagal membaca file backup.")
+            }.onFailure { snackbarHostState.showSnackbar("Import dibatalkan: ${it.message ?: "file tidak valid"}") }
         }
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("Stok Akun") },
-                actions = {
-                    IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) {
-                        Icon(Icons.Filled.FileUpload, contentDescription = "Export backup")
-                    }
-                    IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = "Import backup")
-                    }
+            TopAppBar(title = { Text("Stok Akun") }, actions = {
+                IconButton(onClick = { exportLauncher.launch("stok-akun-backup.zip") }) {
+                    Icon(Icons.Filled.FileUpload, contentDescription = "Export backup")
                 }
-            )
+                IconButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
+                    Icon(Icons.Filled.FileDownload, contentDescription = "Import backup")
+                }
+            })
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddClick,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Tambah Akun") }
-            )
+            ExtendedFloatingActionButton(onClick = onAddClick, icon = { Icon(Icons.Filled.Add, contentDescription = null) }, text = { Text("Tambah Akun") })
         }
     ) { padding ->
         LazyColumn(
@@ -127,15 +107,18 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
+                SummaryCard("Nilai Stok Aktif", formatPrice(activeValue), Modifier.fillMaxWidth())
+            }
+            item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Total Stok", total, Modifier.weight(1f))
-                    SummaryCard("Available", available, Modifier.weight(1f))
+                    SummaryCard("Total Stok", total.toString(), Modifier.weight(1f))
+                    SummaryCard("Available", available.toString(), Modifier.weight(1f))
                 }
             }
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Reserved", reserved, Modifier.weight(1f))
-                    SummaryCard("Sold", sold, Modifier.weight(1f))
+                    SummaryCard("Reserved", reserved.toString(), Modifier.weight(1f))
+                    SummaryCard("Sold", sold.toString(), Modifier.weight(1f))
                 }
             }
             item {
@@ -143,30 +126,22 @@ fun HomeScreen(
                 Text("Stok Terbaru", style = MaterialTheme.typography.titleMedium)
             }
             if (recent.isEmpty()) {
-                item {
-                    Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                item { Text("Belum ada stok akun. Tekan \"Tambah Akun\" untuk mulai.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(recent, key = { it.id }) { account ->
                 val shotCount by viewModel.screenshotCount(account.id).collectAsState()
                 StockCard(account, shotCount) { onAccountClick(account.id) }
             }
-            item {
-                TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") }
-            }
+            item { TextButton(onClick = onSeeAllClick) { Text("Lihat semua stok") } }
         }
     }
 }
 
 @Composable
-private fun SummaryCard(label: String, value: Int, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
+private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text("$value", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
